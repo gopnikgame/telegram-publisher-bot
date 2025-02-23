@@ -10,6 +10,6 @@ class Config:
     SUPPORT_BOT_LINK = os.getenv('SUPPORT_BOT_LINK', '')
     CHANNEL_LINK = os.getenv('CHANNEL_LINK', '')
     ADMIN_IDS = os.getenv('ADMIN_IDS', '').split(',')
-    DEFAULT_FORMAT = os.getenv('DEFAULT_FORMAT', 'modern')
+    DEFAULT_FORMAT = os.getenv('DEFAULT_FORMAT', 'plain').lower()
     HTTPS_PROXY = os.getenv('HTTPS_PROXY')
     MAX_FILE_SIZE = int(os.getenv('MAX_FILE_SIZE', 20)) * 1024 * 1024  # MB to bytes
