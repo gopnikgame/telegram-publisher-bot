@@ -4,6 +4,12 @@ FROM python:3.11-slim
 # Создаем нового пользователя для запуска бота
 RUN groupadd -r botuser && useradd -r -g botuser botuser
 
+# Устанавливаем необходимые системные зависимости
+RUN apt-get update && apt-get install -y \
+    gcc \
+    python3-dev \
+    && rm -rf /var/lib/apt/lists/*
+
 # Устанавливаем рабочую директорию
 WORKDIR /app
 
