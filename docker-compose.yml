@@ -1,9 +1,15 @@
 services:
-  telegram-pot-publisher-bot:
+  telegram-publisher-bot:
     build: .
+    container_name: telegram-publisher-bot
     volumes:
       - .:/app
       - ./logs:/app/logs
     environment:
       - PYTHONPATH=/app
     restart: unless-stopped
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
