@@ -5,11 +5,18 @@ services:
     volumes:
       - .:/app
       - ./logs:/app/logs
+      - ./.env:/app/.env:ro  # Явно монтируем .env как read-only
     environment:
       - PYTHONPATH=/app
+      - TZ=UTC  # Добавляем настройку временной зоны
     restart: unless-stopped
     logging:
       driver: "json-file"
       options:
         max-size: "10m"
         max-file: "3"
+    healthcheck:  # Добавляем проверку здоровья контейнера
+      test: ["CMD", "python", "-c", "import os; exit(0 if os.path.exists('/app/logs/bot.log') else 1)"]
+      interval: 1m
+      timeout: 10s
+      retries: 3
