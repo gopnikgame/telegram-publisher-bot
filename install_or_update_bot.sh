@@ -39,7 +39,8 @@ if [ -d "$TARGET_DIR" ]; then
     git add .
     git commit -m "Автосохранение перед обновлением"
 
-    git pull
+    echo "Получение последних изменений с использованием rebase..."
+    git pull --rebase
 else
     echo "Клонирование репозитория..."
     git clone "$REPO_URL" "$TARGET_DIR"
