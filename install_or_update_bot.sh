@@ -27,9 +27,12 @@ function install_command() {
 check_command "docker"
 check_command "git"
 
+# Установка домашней директории текущего пользователя
+HOME_DIR=$(eval echo ~${SUDO_USER})
+TARGET_DIR="$HOME_DIR/telegram-publisher-bot"
+
 # Клонирование или обновление репозитория
 REPO_URL="https://github.com/gopnikgame/telegram-publisher-bot"
-TARGET_DIR="/root/telegram-publisher-bot"
 
 if [ -d "$TARGET_DIR" ]; then
     echo "Папка уже существует. Удаление текущей папки и клонирование заново..."
