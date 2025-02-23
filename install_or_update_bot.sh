@@ -32,19 +32,12 @@ REPO_URL="https://github.com/gopnikgame/telegram-publisher-bot"
 TARGET_DIR="/root/telegram-publisher-bot"
 
 if [ -d "$TARGET_DIR" ]; then
-    echo "Обновление существующего репозитория..."
-    cd "$TARGET_DIR" || exit
-
-    echo "Сохранение локальных изменений..."
-    git add .
-    git commit -m "Автосохранение перед обновлением"
-
-    echo "Получение последних изменений с использованием rebase..."
-    git pull --rebase
-else
-    echo "Клонирование репозитория..."
-    git clone "$REPO_URL" "$TARGET_DIR"
+    echo "Папка уже существует. Удаление текущей папки и клонирование заново..."
+    rm -rf "$TARGET_DIR"
 fi
+
+echo "Клонирование репозитория..."
+git clone "$REPO_URL" "$TARGET_DIR"
 
 cd "$TARGET_DIR" || exit
 
