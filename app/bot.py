@@ -104,6 +104,16 @@ def stats(update: Update, context: CallbackContext) -> None:
 @check_admin
 def settings(update: Update, context: CallbackContext) -> None:
     """Показывает текущие настройки бота."""
+    links = []
+    if Config.MAIN_BOT_LINK:
+        links.append(f"[{Config.MAIN_BOT_NAME}]({Config.MAIN_BOT_LINK})")
+    if Config.SUPPORT_BOT_LINK:
+        links.append(f"[{Config.SUPPORT_BOT_NAME}]({Config.SUPPORT_BOT_LINK})")
+    if Config.CHANNEL_LINK:
+        links.append(f"[{Config.CHANNEL_NAME}]({Config.CHANNEL_LINK})")
+    
+    links_text = ' | '.join(links) if links else "Не настроены"
+    
     settings_text = f"""
 *Текущие настройки:*
 
@@ -112,9 +122,7 @@ def settings(update: Update, context: CallbackContext) -> None:
 Максимальный размер файла: {Config.MAX_FILE_SIZE/1024/1024}MB
 
 🔗 *Ссылки:*
-Основной бот: {Config.MAIN_BOT_LINK}
-Поддержка: {Config.SUPPORT_BOT_LINK}
-Канал: {Config.CHANNEL_LINK}
+{links_text}
 
 👥 *Доступ:*
 Администраторы: {', '.join(Config.ADMIN_IDS)}
