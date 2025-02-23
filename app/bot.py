@@ -43,6 +43,7 @@ def start(update: Update, context: CallbackContext) -> None:
 /settings - Настройки бота
 /restart - Перезапустить бота
 /update - Обновить настройки из .env
+/test - Включить/выключить тестовый режим
         
 📋 Форматирование:
 /format - Показать примеры форматирования
@@ -76,6 +77,7 @@ RAM: {memory.percent}%
 Канал: {Config.CHANNEL_ID}
 Формат: {Config.DEFAULT_FORMAT}
 Макс. размер файла: {Config.MAX_FILE_SIZE/1024/1024}MB
+Тестовый режим: {'Включен ✅' if Config.TEST_MODE else 'Выключен ❌'}
 
 📊 *Рабочая директория:*
 {os.getcwd()}
@@ -85,7 +87,6 @@ RAM: {memory.percent}%
 @check_admin
 def stats(update: Update, context: CallbackContext) -> None:
     """Показывает статистику использования бота."""
-    # Здесь можно добавить подсчет сообщений из лог-файла
     stats_text = """
 *Статистика использования:*
 
@@ -104,15 +105,7 @@ def stats(update: Update, context: CallbackContext) -> None:
 @check_admin
 def settings(update: Update, context: CallbackContext) -> None:
     """Показывает текущие настройки бота."""
-    links = []
-    if Config.MAIN_BOT_LINK:
-        links.append(f"[{Config.MAIN_BOT_NAME}]({Config.MAIN_BOT_LINK})")
-    if Config.SUPPORT_BOT_LINK:
-        links.append(f"[{Config.SUPPORT_BOT_NAME}]({Config.SUPPORT_BOT_LINK})")
-    if Config.CHANNEL_LINK:
-        links.append(f"[{Config.CHANNEL_NAME}]({Config.CHANNEL_LINK})")
-    
-    links_text = ' | '.join(links) if links else "Не настроены"
+    from app.utils import format_bot_links
     
     settings_text = f"""
 *Текущие настройки:*
@@ -120,9 +113,10 @@ def settings(update: Update, context: CallbackContext) -> None:
 📝 *Форматирование:*
 Формат по умолчанию: {Config.DEFAULT_FORMAT}
 Максимальный размер файла: {Config.MAX_FILE_SIZE/1024/1024}MB
+Тестовый режим: {'Включен ✅' if Config.TEST_MODE else 'Выключен ❌'}
 
 🔗 *Ссылки:*
-{links_text}
+{format_bot_links()}
 
 👥 *Доступ:*
 Администраторы: {', '.join(Config.ADMIN_IDS)}
@@ -131,7 +125,14 @@ ID канала: {Config.CHANNEL_ID}
 🌐 *Прокси:*
 HTTPS прокси: {Config.HTTPS_PROXY or "Не используется"}
 """
-    update.message.reply_text(settings_text, parse_mode=ParseMode.MARKDOWN)
+    try:
+        update.message.reply_text(settings_text, parse_mode=ParseMode.MARKDOWN)
+    except Exception as e:
+        logger.error(f"Ошибка при отправке настроек: {e}")
+        update.message.reply_text(
+            "Ошибка форматирования. Отправляю без разметки:\n\n" + 
+            settings_text.replace('*', '')
+        )
 
 @check_admin
 def set_format(update: Update, context: CallbackContext) -> None:
@@ -149,7 +150,6 @@ def set_format(update: Update, context: CallbackContext) -> None:
         )
         return
     
-    # Здесь можно добавить сохранение формата в .env файл
     update.message.reply_text(f'Формат сообщений установлен: {new_format}')
 
 @check_admin
@@ -197,7 +197,8 @@ def handle_message(update: Update, context: CallbackContext) -> None:
 
     try:
         message = update.message
-        # Исправляем определение parse_mode
+        
+        # Определяем parse_mode на основе формата
         if Config.DEFAULT_FORMAT.lower() == 'markdown':
             parse_mode = ParseMode.MARKDOWN
         elif Config.DEFAULT_FORMAT.lower() == 'html':
@@ -205,11 +206,17 @@ def handle_message(update: Update, context: CallbackContext) -> None:
         else:
             parse_mode = None
 
+        # Определяем целевой чат
+        target_chat_id = (Config.TEST_CHAT_ID or str(user_id)) if Config.TEST_MODE else Config.CHANNEL_ID
+        
+        # Добавляем пометку для тестового режима
+        test_prefix = "[ТЕСТ] " if Config.TEST_MODE else ""
+
         if message.text:
             # Обработка текстового сообщения
-            formatted_text = format_message(message.text)
-            context.bot.send_message(
-                chat_id=Config.CHANNEL_ID,
+            formatted_text = format_message(test_prefix + message.text)
+            sent_message = context.bot.send_message(
+                chat_id=target_chat_id,
                 text=formatted_text,
                 parse_mode=parse_mode
             )
@@ -219,9 +226,9 @@ def handle_message(update: Update, context: CallbackContext) -> None:
             if not check_file_size(photo.file_size):
                 update.message.reply_text('Файл слишком большой.')
                 return
-            caption = format_message(message.caption) if message.caption else ''
-            context.bot.send_photo(
-                chat_id=Config.CHANNEL_ID,
+            caption = format_message(test_prefix + (message.caption if message.caption else ''))
+            sent_message = context.bot.send_photo(
+                chat_id=target_chat_id,
                 photo=photo.file_id,
                 caption=caption,
                 parse_mode=parse_mode
@@ -231,9 +238,9 @@ def handle_message(update: Update, context: CallbackContext) -> None:
             if not check_file_size(message.video.file_size):
                 update.message.reply_text('Файл слишком большой.')
                 return
-            caption = format_message(message.caption) if message.caption else ''
-            context.bot.send_video(
-                chat_id=Config.CHANNEL_ID,
+            caption = format_message(test_prefix + (message.caption if message.caption else ''))
+            sent_message = context.bot.send_video(
+                chat_id=target_chat_id,
                 video=message.video.file_id,
                 caption=caption,
                 parse_mode=parse_mode
@@ -243,17 +250,48 @@ def handle_message(update: Update, context: CallbackContext) -> None:
             if not check_file_size(message.document.file_size):
                 update.message.reply_text('Файл слишком большой.')
                 return
-            caption = format_message(message.caption) if message.caption else ''
-            context.bot.send_document(
-                chat_id=Config.CHANNEL_ID,
+            caption = format_message(test_prefix + (message.caption if message.caption else ''))
+            sent_message = context.bot.send_document(
+                chat_id=target_chat_id,
                 document=message.document.file_id,
                 caption=caption,
                 parse_mode=parse_mode
             )
-        update.message.reply_text('Сообщение успешно опубликовано!')
+
+        # Отправляем информацию о результате
+        if Config.TEST_MODE:
+            status_text = (
+                f"✅ Тестовое сообщение отправлено\n"
+                f"📝 Формат: {Config.DEFAULT_FORMAT}\n"
+                f"🎯 Получатель: {target_chat_id}\n"
+                f"#️⃣ Message ID: {sent_message.message_id}"
+            )
+        else:
+            status_text = "✅ Сообщение успешно опубликовано в канал!"
+            
+        update.message.reply_text(status_text)
+        
     except Exception as e:
         logger.error(f'Ошибка при публикации сообщения: {e}')
-        update.message.reply_text('Произошла ошибка при публикации сообщения.')
+        update.message.reply_text(
+            f'❌ Произошла ошибка при публикации сообщения:\n{str(e)}'
+        )
+
+@check_admin
+def toggle_test_mode(update: Update, context: CallbackContext) -> None:
+    """Включает/выключает тестовый режим."""
+    try:
+        Config.TEST_MODE = not Config.TEST_MODE
+        mode_status = "включен ✅" if Config.TEST_MODE else "выключен ❌"
+        target = f"ID {Config.TEST_CHAT_ID}" if Config.TEST_CHAT_ID else "текущий чат"
+        
+        update.message.reply_text(
+            f"🔄 Тестовый режим {mode_status}\n"
+            f"📨 Сообщения будут отправляться в {target}"
+        )
+    except Exception as e:
+        logger.error(f'Ошибка при переключении тестового режима: {e}')
+        update.message.reply_text(f'Произошла ошибка: {str(e)}')
 
 def main() -> None:
     """Основная функция бота."""
@@ -269,6 +307,7 @@ def main() -> None:
         dispatcher.add_handler(CommandHandler("settings", settings))
         dispatcher.add_handler(CommandHandler("format", format_help))
         dispatcher.add_handler(CommandHandler("setformat", set_format))
+        dispatcher.add_handler(CommandHandler("test", toggle_test_mode))
         
         # Обработчик сообщений
         dispatcher.add_handler(MessageHandler(
@@ -291,6 +330,7 @@ def main() -> None:
 
         logger.info('Бот запущен')
         updater.idle()
+
     except Exception as e:
         logger.error(f'Ошибка при запуске бота: {e}')
 
