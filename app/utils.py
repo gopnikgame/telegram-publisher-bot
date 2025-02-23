@@ -1,55 +1,32 @@
 import logging
 import os
-import re
-from telegram import Message, ParseMode
+from logging.handlers import RotatingFileHandler
 
 def setup_logging():
     """Настройка логирования."""
-    os.makedirs('logs', exist_ok=True)
-    logging.basicConfig(
-        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-        level=logging.INFO,
-        handlers=[
-            logging.FileHandler('logs/bot.log'),
-            logging.StreamHandler()
-        ]
+    log_dir = 'logs'
+    if not os.path.exists(log_dir):
+        os.makedirs(log_dir)
+
+    log_file = os.path.join(log_dir, 'bot.log')
+    formatter = logging.Formatter(
+        '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
     )
 
-def format_message(text: str, format_type: str) -> tuple:
-    """
-    Форматирование сообщения в зависимости от выбранного формата.
-    Возвращает кортеж (отформатированный_текст, parse_mode)
-    """
-    if format_type == "modern":
-        # Не экранируем эмодзи и хештеги
-        return text, ParseMode.MARKDOWN
-    elif format_type == "markdown":
-        return escape_markdown(text), ParseMode.MARKDOWN_V2
-    elif format_type == "html":
-        return escape_html(text), ParseMode.HTML
-    else:  # plain
-        return text, None
+    handler = RotatingFileHandler(log_file, maxBytes=5*1024*1024, backupCount=2)
+    handler.setFormatter(formatter)
 
-def escape_markdown(text: str) -> str:
-    """Экранирование специальных символов для MarkdownV2."""
-    escape_chars = ['_', '*', '[', ']', '(', ')', '~', '`', '>', '#', '+', '-', '=', '|', 
-                   '{', '}', '.', '!']
-    return ''.join('\\' + char if char in escape_chars else char for char in text)
+    logger = logging.getLogger()
+    logger.setLevel(logging.INFO)
+    logger.addHandler(handler)
 
-def escape_html(text: str) -> str:
-    """Экранирование специальных символов для HTML."""
-    return text.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
+    return logger
 
-def check_file_size(message: Message) -> bool:
+def format_message(text):
+    """Форматирование сообщения с добавлением ссылок."""
+    formatted_text = f"{text}\n\n{Config.MAIN_BOT_LINK}\n{Config.SUPPORT_BOT_LINK}\n{Config.CHANNEL_LINK}"
+    return formatted_text
+
+def check_file_size(file_size):
     """Проверка размера файла."""
-    MAX_FILE_SIZE = 50 * 1024 * 1024  # 50MB in bytes
-
-    if message.document:
-        return message.document.file_size <= MAX_FILE_SIZE
-    elif message.video:
-        return message.video.file_size <= MAX_FILE_SIZE
-    elif message.audio:
-        return message.audio.file_size <= MAX_FILE_SIZE
-    elif message.photo:
-        return True  # Telegram автоматически сжимает фото
-    return True
+    return file_size <= Config.MAX_FILE_SIZE
