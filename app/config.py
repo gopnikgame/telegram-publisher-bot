@@ -33,6 +33,10 @@ class Config:
     # Прокси
     HTTPS_PROXY = os.getenv('HTTPS_PROXY')
     
+    # Тестовый режим
+    TEST_MODE = os.getenv('TEST_MODE', 'false').lower() == 'true'
+    TEST_CHAT_ID = os.getenv('TEST_CHAT_ID', '')
+    
     # Ссылки
     MAIN_BOT_NAME, MAIN_BOT_LINK = parse_markdown_link(os.getenv('MAIN_BOT_LINK', ''))
     SUPPORT_BOT_NAME, SUPPORT_BOT_LINK = parse_markdown_link(os.getenv('SUPPORT_BOT_LINK', ''))
