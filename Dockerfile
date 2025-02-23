@@ -1,15 +1,29 @@
-FROM python:3.9-slim
+# Используем более новую версию Python
+FROM python:3.11-slim
 
+# Создаем нового пользователя для запуска бота
+RUN groupadd -r botuser && useradd -r -g botuser botuser
+
+# Устанавливаем рабочую директорию
 WORKDIR /app
 
-# Установка зависимостей
+# Копируем только requirements.txt сначала для кэширования слоя
 COPY requirements.txt .
+
+# Устанавливаем зависимости
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Копирование файлов проекта
+# Копируем файлы проекта
 COPY . .
 
-# Установка переменной окружения PYTHONPATH
+# Создаем директорию для логов и устанавливаем права
+RUN mkdir -p /app/logs && \
+    chown -R botuser:botuser /app
+
+# Переключаемся на пользователя botuser
+USER botuser
+
+# Устанавливаем переменную окружения PYTHONPATH
 ENV PYTHONPATH=/app
 
 # Запуск бота
