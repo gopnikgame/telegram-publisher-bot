@@ -1,33 +1,45 @@
 import logging
 import os
-from logging.handlers import RotatingFileHandler
-from app.config import Config
+import re
+from datetime import datetime
 
 def setup_logging():
     """Настройка логирования."""
-    log_dir = 'logs'
-    if not os.path.exists(log_dir):
-        os.makedirs(log_dir)
-
-    log_file = os.path.join(log_dir, 'bot.log')
-    formatter = logging.Formatter(
-        '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+    if not os.path.exists('logs'):
+        os.makedirs('logs')
+    
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+        handlers=[
+            logging.FileHandler('logs/bot.log'),
+            logging.StreamHandler()
+        ]
     )
-
-    handler = RotatingFileHandler(log_file, maxBytes=5*1024*1024, backupCount=2)
-    handler.setFormatter(formatter)
-
-    logger = logging.getLogger()
-    logger.setLevel(logging.INFO)
-    logger.addHandler(handler)
-
-    return logger
+    
+    return logging.getLogger(__name__)
 
 def format_message(text):
-    """Форматирование сообщения с добавлением ссылок."""
-    formatted_text = f"{text}\n\n{Config.MAIN_BOT_LINK}\n{Config.SUPPORT_BOT_LINK}\n{Config.CHANNEL_LINK}"
-    return formatted_text
+    """Форматирование сообщения перед отправкой."""
+    if text is None:
+        return ''
+    
+    text = text.strip()
+    
+    # Конвертация Modern/Discord формата в Markdown
+    # Заменяем **текст** на *текст* для жирного начертания
+    text = re.sub(r'\*\*(.*?)\*\*', r'*\1*', text)
+    
+    # Обработка эмодзи - оставляем как есть
+    # Обработка списков - добавляем пробел после точки если его нет
+    text = re.sub(r'(\d+\.)(?=\S)', r'\1 ', text)
+    
+    # Исправляем множественные переносы строк
+    text = re.sub(r'\n{3,}', '\n\n', text)
+    
+    return text
 
-def check_file_size(file_size):
+def check_file_size(size):
     """Проверка размера файла."""
-    return file_size <= Config.MAX_FILE_SIZE
+    from app.config import Config
+    return size <= Config.MAX_FILE_SIZE
