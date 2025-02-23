@@ -5,6 +5,15 @@ import re
 # Загрузка переменных окружения из .env файла
 load_dotenv()
 
+def parse_markdown_link(link_str):
+    """Парсит markdown-ссылку и возвращает кортеж (название, URL)."""
+    if not link_str:
+        return '', ''
+    match = re.match(r'\[(.*?)\]\((.*?)\)', link_str)
+    if match:
+        return match.group(1), match.group(2)
+    return '', link_str
+
 class Config:
     # Токен бота
     BOT_TOKEN = os.getenv('BOT_TOKEN')
@@ -24,16 +33,6 @@ class Config:
     # Прокси
     HTTPS_PROXY = os.getenv('HTTPS_PROXY')
     
-    # Ссылки с поддержкой markdown формата
-    @staticmethod
-    def parse_markdown_link(link_str):
-        if not link_str:
-            return '', ''
-        match = re.match(r'\[(.*?)\]\((.*?)\)', link_str)
-        if match:
-            return match.group(1), match.group(2)
-        return '', link_str
-
     # Ссылки
     MAIN_BOT_NAME, MAIN_BOT_LINK = parse_markdown_link(os.getenv('MAIN_BOT_LINK', ''))
     SUPPORT_BOT_NAME, SUPPORT_BOT_LINK = parse_markdown_link(os.getenv('SUPPORT_BOT_LINK', ''))
