@@ -189,13 +189,21 @@ def handle_message(update: Update, context: CallbackContext) -> None:
 
     try:
         message = update.message
+        # Исправляем определение parse_mode
+        if Config.DEFAULT_FORMAT.lower() == 'markdown':
+            parse_mode = ParseMode.MARKDOWN
+        elif Config.DEFAULT_FORMAT.lower() == 'html':
+            parse_mode = ParseMode.HTML
+        else:
+            parse_mode = None
+
         if message.text:
             # Обработка текстового сообщения
             formatted_text = format_message(message.text)
             context.bot.send_message(
                 chat_id=Config.CHANNEL_ID,
                 text=formatted_text,
-                parse_mode=Config.DEFAULT_FORMAT
+                parse_mode=parse_mode
             )
         elif message.photo:
             # Обработка фото
@@ -208,7 +216,7 @@ def handle_message(update: Update, context: CallbackContext) -> None:
                 chat_id=Config.CHANNEL_ID,
                 photo=photo.file_id,
                 caption=caption,
-                parse_mode=Config.DEFAULT_FORMAT
+                parse_mode=parse_mode
             )
         elif message.video:
             # Обработка видео
@@ -220,7 +228,7 @@ def handle_message(update: Update, context: CallbackContext) -> None:
                 chat_id=Config.CHANNEL_ID,
                 video=message.video.file_id,
                 caption=caption,
-                parse_mode=Config.DEFAULT_FORMAT
+                parse_mode=parse_mode
             )
         elif message.document:
             # Обработка документов
@@ -232,7 +240,7 @@ def handle_message(update: Update, context: CallbackContext) -> None:
                 chat_id=Config.CHANNEL_ID,
                 document=message.document.file_id,
                 caption=caption,
-                parse_mode=Config.DEFAULT_FORMAT
+                parse_mode=parse_mode
             )
         update.message.reply_text('Сообщение успешно опубликовано!')
     except Exception as e:
