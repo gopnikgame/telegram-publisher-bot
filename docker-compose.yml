@@ -1,19 +1,11 @@
-services:
-  bot:
-    build: .
-    container_name: telegram-publisher-bot
-    restart: unless-stopped
-    networks:
-      - bot-network
-    volumes:
-      - ./logs:/app/logs
-      - ./.env:/app/.env
-    healthcheck:
-      test: ["CMD", "python", "-c", "import requests; requests.get('https://api.telegram.org')"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
+version: '3.8'
 
-networks:
-  bot-network:
-    driver: bridge
+services:
+  telegram-publisher-bot:
+    build: .
+    volumes:
+      - .:/app
+      - ./logs:/app/logs
+    environment:
+      - PYTHONPATH=/app
+    restart: unless-stopped
