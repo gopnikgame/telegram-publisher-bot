@@ -34,6 +34,11 @@ TARGET_DIR="/root/telegram-publisher-bot"
 if [ -d "$TARGET_DIR" ]; then
     echo "Обновление существующего репозитория..."
     cd "$TARGET_DIR" || exit
+
+    echo "Сохранение локальных изменений..."
+    git add .
+    git commit -m "Автосохранение перед обновлением"
+
     git pull
 else
     echo "Клонирование репозитория..."
