@@ -85,6 +85,9 @@ while true; do
             echo "Остановка и удаление существующих контейнеров..."
             docker-compose down
 
+            echo "Удаление сети telegram-publisher-bot_default..."
+            docker network rm telegram-publisher-bot_default || true
+
             echo "Компиляция и запуск контейнеров..."
             docker-compose build
             docker-compose up -d
