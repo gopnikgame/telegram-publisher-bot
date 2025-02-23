@@ -31,6 +31,12 @@ check_command "git"
 HOME_DIR=$(eval echo ~${SUDO_USER})
 TARGET_DIR="$HOME_DIR/telegram-publisher-bot"
 
+# Сохранение .env файла, если он существует
+if [ -f "$TARGET_DIR/.env" ]; then
+    echo "Сохранение .env файла..."
+    cp "$TARGET_DIR/.env" /tmp/.env.backup
+fi
+
 # Клонирование или обновление репозитория
 REPO_URL="https://github.com/gopnikgame/telegram-publisher-bot"
 
@@ -42,7 +48,16 @@ fi
 echo "Клонирование репозитория..."
 git clone "$REPO_URL" "$TARGET_DIR"
 
+# Восстановление .env файла, если он был сохранен
+if [ -f "/tmp/.env.backup" ]; then
+    echo "Восстановление .env файла..."
+    mv /tmp/.env.backup "$TARGET_DIR/.env"
+fi
+
 cd "$TARGET_DIR" || exit
+
+# Создание директории для логов
+mkdir -p logs
 
 # Функция для создания или редактирования .env файла
 function manage_env_file() {
