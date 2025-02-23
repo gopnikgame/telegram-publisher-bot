@@ -83,7 +83,7 @@ while true; do
             ;;
         2)
             echo "Остановка и удаление существующих контейнеров..."
-            docker-compose down
+            docker-compose down --remove-orphans
 
             echo "Удаление сети telegram-publisher-bot_default..."
             docker network rm telegram-publisher-bot_default || true
