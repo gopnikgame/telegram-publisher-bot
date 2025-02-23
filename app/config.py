@@ -23,15 +23,33 @@ class Config:
         if not self.ADMIN_IDS:
             raise ValueError("Не установлены ADMIN_IDS")
 
+        # Формат сообщений (markdown, html, plain, modern)
+        self.DEFAULT_FORMAT = os.getenv("DEFAULT_FORMAT", "modern").lower()
+        if self.DEFAULT_FORMAT not in ["markdown", "html", "plain", "modern"]:
+            self.DEFAULT_FORMAT = "modern"
+
         # Настройки прокси
         self.HTTPS_PROXY = os.getenv('HTTPS_PROXY')
         if self.HTTPS_PROXY:
             os.environ['https_proxy'] = self.HTTPS_PROXY
 
-    def create_links(self):
-        """Создает строку с гиперссылками."""
-        return (
-            f"\n\n{self.MAIN_BOT_LINK}\n"
-            f"{self.SUPPORT_BOT_LINK}\n"
-            f"{self.CHANNEL_LINK}"
-        )
+    def create_links(self, format_type=None):
+        """Создает строку с гиперссылками в заданном формате."""
+        format_type = format_type or self.DEFAULT_FORMAT
+
+        if format_type == "modern":
+            return f"\n\n{self.MAIN_BOT_LINK}\n{self.SUPPORT_BOT_LINK}\n{self.CHANNEL_LINK}"
+        elif format_type == "html":
+            return (
+                f"\n\n{self.MAIN_BOT_LINK.replace('[', '<a href=\"').replace(']', '\">').replace(')', '</a>')}\n"
+                f"{self.SUPPORT_BOT_LINK.replace('[', '<a href=\"').replace(']', '\">').replace(')', '</a>')}\n"
+                f"{self.CHANNEL_LINK.replace('[', '<a href=\"').replace(']', '\">').replace(')', '</a>')}"
+            )
+        elif format_type == "markdown":
+            return f"\n\n{self.MAIN_BOT_LINK}\n{self.SUPPORT_BOT_LINK}\n{self.CHANNEL_LINK}"
+        else:  # plain
+            return (
+                f"\n\n{self.MAIN_BOT_LINK.split('](')[0][1:]}: {self.MAIN_BOT_LINK.split('](')[1][:-1]}\n"
+                f"{self.SUPPORT_BOT_LINK.split('](')[0][1:]}: {self.SUPPORT_BOT_LINK.split('](')[1][:-1]}\n"
+                f"{self.CHANNEL_LINK.split('](')[0][1:]}: {self.CHANNEL_LINK.split('](')[1][:-1]}"
+            )
