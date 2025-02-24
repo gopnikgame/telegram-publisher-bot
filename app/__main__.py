@@ -1,73 +1,47 @@
 import logging
 import signal
 import sys
-import os
-from datetime import datetime
+from pathlib import Path
 from telegram.ext import Updater
 from app.bot import setup_bot
 from app.config import config
 from app.utils import setup_logging
 
-# Глобальные переменные
-updater = None
-START_TIME = datetime.utcnow()
-CREATED_BY = os.getenv('CREATED_BY', 'unknown')
-CREATED_AT = os.getenv('CREATED_AT', datetime.utcnow().strftime('%Y-%m-%d_%H:%M'))
-
-def signal_handler(signum, frame):
-    """Обработчик сигналов для корректного завершения работы."""
+# Добавляем проверку .env файла
+def check_env():
     logger = logging.getLogger(__name__)
-    logger.info(f"Получен сигнал {signum}, завершаем работу...")
+    env_path = Path('/app/.env')
     
-    if updater:
-        logger.info("Останавливаем бота...")
-        try:
-            updater.stop()
-            updater.is_idle = False
-        except Exception as e:
-            logger.error(f"Ошибка при остановке бота: {e}")
-    
-    sys.exit(0)
-
-def setup_signal_handlers():
-    """Настройка обработчиков сигналов."""
-    signal.signal(signal.SIGTERM, signal_handler)
-    signal.signal(signal.SIGINT, signal_handler)
-    
-    # Игнорируем SIGPIPE
-    signal.signal(signal.SIGPIPE, signal.SIG_IGN)
-
-def write_pid():
-    """Запись PID процесса."""
-    try:
-        with open('/app/logs/bot.pid', 'w') as f:
-            f.write(str(os.getpid()))
-    except Exception as e:
-        logging.error(f"Ошибка при записи PID: {e}")
+    if not env_path.exists():
+        logger.error("Файл .env не найден в /app/.env")
+        return False
+        
+    with open(env_path) as f:
+        content = f.read()
+        logger.info(f"Содержимое .env файла: {len(content)} байт")
+        if 'BOT_TOKEN=' not in content:
+            logger.error("BOT_TOKEN не найден в .env файле")
+            return False
+        if content.find('BOT_TOKEN=') + 9 >= len(content) or not content[content.find('BOT_TOKEN=') + 9:].strip():
+            logger.error("BOT_TOKEN пустой в .env файле")
+            return False
+    return True
 
 def main():
-    global updater
-    
     # Настраиваем логирование
     logger = setup_logging()
     
     try:
-        # Записываем информацию о запуске
-        logger.info(f"Bot started by {CREATED_BY} at {CREATED_AT}")
-        logger.info(f"Current UTC time: {datetime.utcnow().strftime('%Y-%m-%d %H:%M:%S')}")
-        
-        # Устанавливаем обработчики сигналов
-        setup_signal_handlers()
-        
-        # Записываем PID
-        write_pid()
-        
+        # Проверяем .env файл
+        if not check_env():
+            sys.exit(1)
+            
         # Проверяем токен
         if not config.BOT_TOKEN:
             logger.error("BOT_TOKEN не установлен в .env файле")
             sys.exit(1)
 
-        # Создаем updater с повышенными таймаутами
+        # Создаем updater
         updater = Updater(
             token=config.BOT_TOKEN,
             use_context=True,
@@ -83,31 +57,14 @@ def main():
 
         # Запускаем бота
         logger.info("Бот запускается...")
-        
-        # Используем polling с обработкой ошибок
-        updater.start_polling(
-            poll_interval=1.0,
-            timeout=30,
-            clean=True,
-            bootstrap_retries=-1,
-            drop_pending_updates=True
-        )
+        updater.start_polling()
 
         logger.info("Бот успешно запущен")
-        
-        # Запускаем бота до прерывания
         updater.idle()
 
     except Exception as e:
         logger.critical(f"Критическая ошибка: {e}", exc_info=True)
         sys.exit(1)
-    finally:
-        # Очистка при выходе
-        try:
-            if os.path.exists('/app/logs/bot.pid'):
-                os.remove('/app/logs/bot.pid')
-        except Exception as e:
-            logger.error(f"Ошибка при очистке PID файла: {e}")
 
 if __name__ == '__main__':
     main()
