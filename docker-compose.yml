@@ -15,12 +15,15 @@ services:
         source: ${PWD}/.env
         target: /app/.env
         read_only: true
-      - ./logs:/app/logs
+      - type: bind
+        source: ${PWD}/logs
+        target: /app/logs
     environment:
       - PYTHONUNBUFFERED=1
       - TZ=UTC
       - CREATED_BY=gopnikgame
-      - CREATED_AT=2025-02-24_12:12:50
+      - CREATED_AT=2025-02-24_12:23:03
+    user: "${DOCKER_UID}:${DOCKER_GID}"
     logging:
       driver: "json-file"
       options:
