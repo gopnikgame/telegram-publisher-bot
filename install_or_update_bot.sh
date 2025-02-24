@@ -179,39 +179,18 @@ EOL
         fi
     fi
 
-    # Проверяем и управляем параметрами
-    local missing_params=()
-    while IFS= read -r line; do
-        if [[ $line =~ ^BOT_TOKEN=$ ]]; then
-            missing_params+=("BOT_TOKEN")
-        fi
-        if [[ $line =~ ^ADMIN_IDS=$ ]]; then
-            missing_params+=("ADMIN_IDS")
-        fi
-        if [[ $line =~ ^CHANNEL_ID=$ ]]; then
-            missing_params+=("CHANNEL_ID")
-        fi
-    done < "$env_file"
-
-    # Обработка отсутствующих параметров
-    if [ ${#missing_params[@]} -gt 0 ] || [ "$created" = true ]; then
-        log "YELLOW" "⚠️ Необходимо настроить следующие параметры:"
-        for param in "${missing_params[@]}"; do
-            echo "   • $param"
-        done
-
-        read -r -p "Настроить параметры сейчас? [Y/n] " response
-        response=${response:-Y}
-        if [[ "$response" =~ ^([yY][eE][sS]|[yY])$ ]]; then
-            if command -v nano &> /dev/null; then
-                nano "$env_file"
-            else
-                vi "$env_file"
-            fi
+    # Предлагаем отредактировать файл
+    read -r -p "Редактировать .env файл сейчас? [Y/n] " response
+    response=${response:-Y}
+    if [[ "$response" =~ ^([yY][eE][sS]|[yY])$ ]]; then
+        if command -v nano &> /dev/null; then
+            nano "$env_file"
         else
-            log "RED" "❌ Бот не будет работать без настроенных параметров"
-            return 1
+            vi "$env_file"
         fi
+    else
+        log "YELLOW" "⚠️ Файл .env необходимо настроить для работы бота."
+        return 1
     fi
 
     # Устанавливаем правильные права доступа
