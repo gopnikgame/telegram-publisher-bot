@@ -1,38 +1,13 @@
 services:
   bot:
-    build: 
-      context: .
-      args:
-        - DOCKER_UID=${DOCKER_UID:-1000}
-        - DOCKER_GID=${DOCKER_GID:-1000}
+    build: .
     container_name: telegram-publisher-bot
     restart: unless-stopped
-    init: true
-    stop_grace_period: 30s
-    stop_signal: SIGTERM
     volumes:
-      - type: bind
-        source: ${PWD}/.env
-        target: /app/.env
-        read_only: true
-      - type: bind
-        source: ${PWD}/logs
-        target: /app/logs
-        consistency: delegated
+      - ./.env:/app/.env:ro
+      - ./logs:/app/logs
     environment:
       - PYTHONUNBUFFERED=1
       - TZ=UTC
       - CREATED_BY=gopnikgame
-      - CREATED_AT=2025-02-24_12:48:37
-    user: "${DOCKER_UID}:${DOCKER_GID}"
-    logging:
-      driver: "json-file"
-      options:
-        max-size: "10m"
-        max-file: "3"
-    healthcheck:
-      test: ["CMD", "sh", "-c", "test -s /app/.env && grep -q '^BOT_TOKEN=' /app/.env"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 10s
+      - CREATED_AT=2025-02-24_13:30:15
