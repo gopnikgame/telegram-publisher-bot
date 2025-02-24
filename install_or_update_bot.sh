@@ -132,31 +132,115 @@ setup_permissions() {
 manage_env_file() {
     local env_file="$TARGET_DIR/.env"
     local env_example="$TARGET_DIR/.env.example"
+    local created=false
     
+    log "BLUE" "📝 Управление конфигурацией .env..."
+    
+    # Проверяем существование файлов
     if [ ! -f "$env_file" ]; then
         if [ -f "$env_example" ]; then
             cp "$env_example" "$env_file"
+            created=true
             log "GREEN" "✅ Создан новый .env файл из примера"
         else
             log "RED" "❌ Файл .env.example не найден"
+            # Создаем базовый .env файл
+            cat > "$env_file" << EOL
+# Конфигурация бота
+BOT_TOKEN=
+ADMIN_IDS=
+CHANNEL_ID=
+
+# Настройки форматирования
+DEFAULT_FORMAT=markdown
+MAX_FILE_SIZE=20971520
+
+# Ссылки
+MAIN_BOT_NAME=Основной бот
+MAIN_BOT_LINK=
+SUPPORT_BOT_NAME=Техподдержка
+SUPPORT_BOT_LINK=
+CHANNEL_NAME=Канал проекта
+CHANNEL_LINK=
+
+# Тестовый режим
+TEST_MODE=false
+TEST_CHAT_ID=
+
+# Прокси (если нужен)
+HTTPS_PROXY=
+EOL
+            created=true
+            log "YELLOW" "⚠️ Создан базовый .env файл"
+        fi
+    fi
+
+    # Проверяем обязательные параметры
+    local missing_params=()
+    while IFS= read -r line; do
+        if [[ $line =~ ^BOT_TOKEN=$ ]]; then
+            missing_params+=("BOT_TOKEN")
+        fi
+        if [[ $line =~ ^ADMIN_IDS=$ ]]; then
+            missing_params+=("ADMIN_IDS")
+        fi
+        if [[ $line =~ ^CHANNEL_ID=$ ]]; then
+            missing_params+=("CHANNEL_ID")
+        fi
+    done < "$env_file"
+
+    # Если есть отсутствующие параметры или файл только что создан
+    if [ ${#missing_params[@]} -gt 0 ] || [ "$created" = true ]; then
+        log "YELLOW" "⚠️ Необходимо настроить следующие параметры:"
+        for param in "${missing_params[@]}"; do
+            echo "   • $param"
+        done
+        
+        read -r -p "Настроить параметры сейчас? [Y/n] " response
+        response=${response:-Y}
+        if [[ "$response" =~ ^([yY][eE][sS]|[yY])$ ]]; then
+            if command -v nano &> /dev/null; then
+                nano "$env_file"
+            else
+                vi "$env_file"
+            fi
+            
+            # Проверяем, заполнены ли обязательные параметры
+            local still_missing=false
+            while IFS= read -r line; do
+                if [[ $line =~ ^(BOT_TOKEN|ADMIN_IDS|CHANNEL_ID)=$ ]]; then
+                    still_missing=true
+                    break
+                fi
+            done < "$env_file"
+            
+            if [ "$still_missing" = true ]; then
+                log "RED" "❌ Обязательные параметры все еще не настроены"
+                log "YELLOW" "⚠️ Бот не будет работать без настроенных параметров"
+                return 1
+            fi
+        else
+            log "RED" "❌ Бот не будет работать без настроенных параметров"
             return 1
         fi
-    fi
-    
-    # Проверяем содержимое файла
-    if [ ! -s "$env_file" ]; then
-        log "YELLOW" "⚠️ Файл .env пуст"
-    fi
-    
-    # Спрашиваем пользователя о редактировании
-    read -r -p "Хотите отредактировать .env файл? [y/N] " response
-    if [[ "$response" =~ ^([yY][eE][sS]|[yY])$ ]]; then
-        if command -v nano &> /dev/null; then
-            nano "$env_file"
-        else
-            vi "$env_file"
+    else
+        # Если все параметры заполнены, спрашиваем о редактировании
+        read -r -p "Хотите отредактировать существующие настройки? [y/N] " response
+        if [[ "$response" =~ ^([yY][eE][sS]|[yY])$ ]]; then
+            if command -v nano &> /dev/null; then
+                nano "$env_file"
+            else
+                vi "$env_file"
+            fi
         fi
     fi
+
+    # Устанавливаем правильные права доступа
+    chmod 600 "$env_file"
+    chown "${SUDO_USER:-$USER}:${SUDO_USER:-$USER}" "$env_file"
+    
+    log "GREEN" "✅ Конфигурация .env завершена"
+    return 0
 }
 
 # Функция для принудительного удаления контейнера
@@ -216,7 +300,35 @@ manage_container() {
     
     # Экспортируем переменные окружения
     export DOCKER_UID DOCKER_GID
-    export CREATED_BY CREATED_AT
+    export CREATED_BY="gopnikgame"
+    export CREATED_AT="2025-02-24 11:57:51"
+    
+    # Проверка конфигурации перед запуском/перезапуском
+    if [ "$action" = "start" ] || [ "$action" = "restart" ]; then
+        if [ ! -f "$TARGET_DIR/.env" ]; then
+            log "RED" "❌ Файл .env не найден"
+            log "YELLOW" "⚠️ Сначала настройте конфигурацию (пункт 1 в меню)"
+            return 1
+        fi
+        
+        if ! grep -q "^BOT_TOKEN=.\\+" "$TARGET_DIR/.env"; then
+            log "RED" "❌ BOT_TOKEN не настроен в .env файле"
+            log "YELLOW" "⚠️ Сначала настройте конфигурацию (пункт 1 в меню)"
+            return 1
+        fi
+        
+        if ! grep -q "^ADMIN_IDS=.\\+" "$TARGET_DIR/.env"; then
+            log "RED" "❌ ADMIN_IDS не настроен в .env файле"
+            log "YELLOW" "⚠️ Сначала настройте конфигурацию (пункт 1 в меню)"
+            return 1
+        fi
+        
+        if ! grep -q "^CHANNEL_ID=.\\+" "$TARGET_DIR/.env"; then
+            log "RED" "❌ CHANNEL_ID не настроен в .env файле"
+            log "YELLOW" "⚠️ Сначала настройте конфигурацию (пункт 1 в меню)"
+            return 1
+        fi
+    fi
     
     case $action in
         "restart")
@@ -238,18 +350,59 @@ manage_container() {
             ;;
     esac
     
-    if [ $? -eq 0 ]; then
+    local exit_code=$?
+    if [ $exit_code -eq 0 ]; then
         log "GREEN" "✅ Операция успешно выполнена"
-        # Ждем немного и проверяем healthcheck
-        sleep 5
-        if docker ps | grep -q "telegram-publisher-bot" && \
-           docker inspect --format='{{.State.Health.Status}}' telegram-publisher-bot 2>/dev/null | grep -q "healthy"; then
-            log "GREEN" "✅ Контейнер работает корректно"
-        else
-            log "YELLOW" "⚠️ Контейнер запущен, но healthcheck еще не пройден"
+        
+        # Если это запуск или перезапуск, проверяем статус
+        if [ "$action" = "start" ] || [ "$action" = "restart" ]; then
+            # Ждем немного и проверяем healthcheck
+            local max_attempts=6
+            local attempt=1
+            local container_healthy=false
+            
+            while [ $attempt -le $max_attempts ]; do
+                log "BLUE" "🔍 Проверка состояния контейнера (попытка $attempt из $max_attempts)..."
+                sleep 5
+                
+                if ! docker ps | grep -q "telegram-publisher-bot"; then
+                    log "RED" "❌ Контейнер не запущен"
+                    return 1
+                fi
+                
+                local health_status=$(docker inspect --format='{{.State.Health.Status}}' telegram-publisher-bot 2>/dev/null || echo "unknown")
+                
+                case $health_status in
+                    "healthy")
+                        log "GREEN" "✅ Контейнер работает корректно"
+                        container_healthy=true
+                        break
+                        ;;
+                    "starting")
+                        log "YELLOW" "⚠️ Контейнер запускается..."
+                        ;;
+                    "unhealthy")
+                        log "RED" "❌ Контейнер в нерабочем состоянии"
+                        docker-compose logs --tail=20
+                        return 1
+                        ;;
+                    *)
+                        log "YELLOW" "⚠️ Статус проверки: $health_status"
+                        ;;
+                esac
+                
+                attempt=$((attempt + 1))
+            done
+            
+            if [ "$container_healthy" = false ]; then
+                log "YELLOW" "⚠️ Контейнер запущен, но healthcheck не пройден"
+                log "YELLOW" "⚠️ Проверьте логи для деталей:"
+                docker-compose logs --tail=20
+            fi
         fi
     else
-        log "RED" "❌ Ошибка при выполнении операции"
+        log "RED" "❌ Ошибка при выполнении операции (код: $exit_code)"
+        docker-compose logs --tail=20
         return 1
     fi
 }
@@ -350,7 +503,12 @@ while true; do
             manage_env_file
             ;;
         2)
+            log "BLUE" "🚀 Запуск установки..."
             update_repo
+            if ! manage_env_file; then
+                log "RED" "❌ Установка прервана из-за проблем с конфигурацией"
+                continue
+            fi
             setup_permissions "$TARGET_DIR"
             manage_container "start"
             check_bot_status
