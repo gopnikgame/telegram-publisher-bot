@@ -1,4 +1,3 @@
-# Используем более новую версию Python
 FROM python:3.11-slim
 
 # Создаем нового пользователя для запуска бота
@@ -10,7 +9,6 @@ RUN apt-get update && apt-get install -y \
     python3-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Устанавливаем рабочую директорию
 WORKDIR /app
 
 # Копируем только requirements.txt сначала для кэширования слоя
