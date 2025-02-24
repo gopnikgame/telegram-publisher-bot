@@ -4,19 +4,7 @@ import re
 from datetime import datetime
 from typing import List, Optional
 from logging.handlers import RotatingFileHandler
-from pathlib import Path
 
-# Константы для цветного вывода
-class Colors:
-    HEADER = '\033[95m'
-    BLUE = '\033[94m'
-    GREEN = '\033[92m'
-    YELLOW = '\033[93m'
-    RED = '\033[91m'
-    RESET = '\033[0m'
-    BOLD = '\033[1m'
-
-# Исключения
 class MessageFormattingError(Exception):
     """Ошибка форматирования сообщения"""
     pass
@@ -25,65 +13,44 @@ class FileSizeError(Exception):
     """Ошибка размера файла"""
     pass
 
-class LogSetupError(Exception):
-    """Ошибка настройки логирования"""
-    pass
-
-def log(color: str, message: str) -> None:
-    """Выводит сообщение в консоль с указанным цветом."""
-    colors = {
-        "RED": Colors.RED,
-        "GREEN": Colors.GREEN,
-        "YELLOW": Colors.YELLOW,
-        "BLUE": Colors.BLUE,
-        "HEADER": Colors.HEADER
-    }
-    color_code = colors.get(color.upper(), Colors.RESET)
-    print(f"{color_code}{message}{Colors.RESET}", flush=True)
-
 def setup_logging():
     """Настройка логирования с ротацией файлов."""
-    log_dir = Path('/app/logs')
-    try:
-        # Создаем директорию если её нет
-        log_dir.mkdir(parents=True, exist_ok=True)
-        
-        # Основной файл лога
-        main_handler = RotatingFileHandler(
-            log_dir / 'bot.log',
-            maxBytes=1024 * 1024,  # 1 MB
-            backupCount=5,
-            encoding='utf-8'
-        )
-        
-        # Отдельный файл для ошибок
-        error_handler = RotatingFileHandler(
-            log_dir / 'error.log',
-            maxBytes=1024 * 1024,
-            backupCount=3,
-            encoding='utf-8'
-        )
-        error_handler.setLevel(logging.ERROR)
-        
-        # Форматирование
-        formatter = logging.Formatter(
-            '%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-            datefmt='%Y-%m-%d %H:%M:%S'
-        )
-        main_handler.setFormatter(formatter)
-        error_handler.setFormatter(formatter)
-        
-        # Настройка логгера
-        logger = logging.getLogger(__name__)
-        logger.setLevel(logging.INFO)
-        logger.addHandler(main_handler)
-        logger.addHandler(error_handler)
-        logger.addHandler(logging.StreamHandler())
-        
-        return logger
-    except Exception as e:
-        log("RED", f"❌ Ошибка настройки логирования: {e}")
-        raise LogSetupError(str(e))
+    if not os.path.exists('logs'):
+        os.makedirs('logs')
+    
+    # Основной файл лога
+    main_handler = RotatingFileHandler(
+        'logs/bot.log',
+        maxBytes=1024 * 1024,  # 1 MB
+        backupCount=5,
+        encoding='utf-8'
+    )
+    
+    # Отдельный файл для ошибок
+    error_handler = RotatingFileHandler(
+        'logs/error.log',
+        maxBytes=1024 * 1024,
+        backupCount=3,
+        encoding='utf-8'
+    )
+    error_handler.setLevel(logging.ERROR)
+    
+    # Форматирование
+    formatter = logging.Formatter(
+        '%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+        datefmt='%Y-%m-%d %H:%M:%S'
+    )
+    main_handler.setFormatter(formatter)
+    error_handler.setFormatter(formatter)
+    
+    # Настройка логгера
+    logger = logging.getLogger(__name__)
+    logger.setLevel(logging.INFO)
+    logger.addHandler(main_handler)
+    logger.addHandler(error_handler)
+    logger.addHandler(logging.StreamHandler())
+    
+    return logger
 
 def format_bot_links(format_type: str = 'markdown') -> str:
     """Форматирование ссылок ботов и канала."""
@@ -174,12 +141,3 @@ def check_file_size(size: int, max_size: Optional[int] = None) -> bool:
     if size > limit:
         raise FileSizeError(f"Размер файла ({size} байт) превышает лимит ({limit} байт)")
     return True
-
-def force_remove_container() -> None:
-    """Принудительно удаляет контейнер."""
-    log("BLUE", "🔄 Принудительное удаление контейнера...")
-    try:
-        os.system("docker rm -f telegram-publisher-bot > /dev/null 2>&1")
-        log("GREEN", "✅ Контейнер успешно удален")
-    except Exception as e:
-        log("RED", f"❌ Ошибка при удалении контейнера: {e}")
