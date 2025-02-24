@@ -1,37 +1,47 @@
 import os
-from typing import List, Optional
+from pathlib import Path
+from dotenv import load_dotenv
+
+def load_env():
+    """Load environment variables from .env file with detailed logging."""
+    env_path = Path('/app/.env')
+    if not env_path.exists():
+        raise FileNotFoundError(f"File not found: {env_path}")
+        
+    # Загружаем переменные окружения из файла .env
+    load_dotenv(env_path)
+    
+    # Проверяем загрузку BOT_TOKEN
+    bot_token = os.getenv('BOT_TOKEN')
+    if not bot_token:
+        with open(env_path) as f:
+            print(f"DEBUG: .env contents: {f.read()}")
+        raise ValueError("BOT_TOKEN not found in environment variables")
+
+# Загружаем конфигурацию
+load_env()
 
 class Config:
-    def __init__(self):
-        self.BOT_TOKEN: str = os.getenv('BOT_TOKEN', '')
-        self.ADMIN_IDS: List[str] = os.getenv('ADMIN_IDS', '').split(',')
-        self.CHANNEL_ID: str = os.getenv('CHANNEL_ID', '')
+    BOT_TOKEN = os.getenv('BOT_TOKEN')
+    if not BOT_TOKEN:
+        raise ValueError("BOT_TOKEN не установлен в .env файле")
         
-        # Настройки форматирования
-        self.DEFAULT_FORMAT: str = os.getenv('DEFAULT_FORMAT', 'markdown')
-        self.MAX_FILE_SIZE: int = int(os.getenv('MAX_FILE_SIZE', '20971520'))  # 20MB по умолчанию
-        
-        # Ссылки
-        self.MAIN_BOT_LINK: Optional[str] = os.getenv('MAIN_BOT_LINK')
-        self.MAIN_BOT_NAME: Optional[str] = os.getenv('MAIN_BOT_NAME', 'Основной бот')
-        self.SUPPORT_BOT_LINK: Optional[str] = os.getenv('SUPPORT_BOT_LINK')
-        self.SUPPORT_BOT_NAME: Optional[str] = os.getenv('SUPPORT_BOT_NAME', 'Техподдержка')
-        self.CHANNEL_LINK: Optional[str] = os.getenv('CHANNEL_LINK')
-        self.CHANNEL_NAME: Optional[str] = os.getenv('CHANNEL_NAME', 'Канал проекта')
-        
-        # Тестовый режим
-        self._test_mode: bool = os.getenv('TEST_MODE', 'false').lower() == 'true'
-        self.TEST_CHAT_ID: Optional[str] = os.getenv('TEST_CHAT_ID')
-        
-        # Прокси
-        self.HTTPS_PROXY: Optional[str] = os.getenv('HTTPS_PROXY')
-
-    @property
-    def TEST_MODE(self) -> bool:
-        return self._test_mode
-
-    @TEST_MODE.setter
-    def TEST_MODE(self, value: bool):
-        self._test_mode = value
+    ADMIN_IDS = [int(x) for x in os.getenv('ADMIN_IDS', '').split(',') if x]
+    CHANNEL_ID = int(os.getenv('CHANNEL_ID', 0))
+    
+    DEFAULT_FORMAT = os.getenv('DEFAULT_FORMAT', 'markdown')
+    MAX_FILE_SIZE = int(os.getenv('MAX_FILE_SIZE', 20 * 1024 * 1024))  # 20MB by default
+    
+    MAIN_BOT_NAME = os.getenv('MAIN_BOT_NAME', 'Основной бот')
+    MAIN_BOT_LINK = os.getenv('MAIN_BOT_LINK', '')
+    SUPPORT_BOT_NAME = os.getenv('SUPPORT_BOT_NAME', 'Техподдержка')
+    SUPPORT_BOT_LINK = os.getenv('SUPPORT_BOT_LINK', '')
+    CHANNEL_NAME = os.getenv('CHANNEL_NAME', 'Канал проекта')
+    CHANNEL_LINK = os.getenv('CHANNEL_LINK', '')
+    
+    TEST_MODE = os.getenv('TEST_MODE', 'false').lower() == 'true'
+    TEST_CHAT_ID = int(os.getenv('TEST_CHAT_ID', 0))
+    
+    HTTPS_PROXY = os.getenv('HTTPS_PROXY')
 
 config = Config()
