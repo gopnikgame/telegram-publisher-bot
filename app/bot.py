@@ -141,16 +141,25 @@ def format_command(update: Update, context: CallbackContext) -> None:
 @check_admin
 def stats(update: Update, context: CallbackContext) -> None:
     """Показывает статистику бота."""
+    import psutil
+    
     uptime = datetime.now() - START_TIME
     hours, remainder = divmod(uptime.seconds, 3600)
     minutes, seconds = divmod(remainder, 60)
+    
+    # Получаем информацию о процессе
+    process = psutil.Process()
+    memory_info = process.memory_info()
+    cpu_percent = process.cpu_percent(interval=1)
     
     stats_message = (
         "📊 Статистика бота:\n\n"
         f"⏱ Время работы: {uptime.days}д {hours}ч {minutes}м {seconds}с\n"
         f"📝 Формат: {config.DEFAULT_FORMAT}\n"
         f"🔄 Тестовый режим: {'включен' if config.TEST_MODE else 'выключен'}\n"
-        f"👥 Администраторов: {len(config.ADMIN_IDS)}"
+        f"👥 Администраторов: {len(config.ADMIN_IDS)}\n"
+        f"💾 Использование памяти: {memory_info.rss / 1024 / 1024:.1f} MB\n"
+        f"⚡ Загрузка CPU: {cpu_percent:.1f}%"
     )
     
     update.message.reply_text(stats_message)
