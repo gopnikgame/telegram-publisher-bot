@@ -18,11 +18,12 @@ services:
       - type: bind
         source: ${PWD}/logs
         target: /app/logs
+        consistency: delegated
     environment:
       - PYTHONUNBUFFERED=1
       - TZ=UTC
       - CREATED_BY=gopnikgame
-      - CREATED_AT=2025-02-24_12:27:58
+      - CREATED_AT=2025-02-24_12:48:37
     user: "${DOCKER_UID}:${DOCKER_GID}"
     logging:
       driver: "json-file"
