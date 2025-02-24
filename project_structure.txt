@@ -5,9 +5,11 @@ telegram-publisher-bot/
 │   ├── config.py
 │   └── utils.py
 ├── logs/
-├── .env
 ├── .dockerignore
+├── .env
+├── .env.example
 ├── .gitignore
 ├── docker-compose.yml
 ├── Dockerfile
+├── install_or_update_bot.sh
 └── requirements.txt
