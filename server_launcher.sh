@@ -9,7 +9,7 @@ TEMP_DIR=$(mktemp -d)
 PROJECT_DIR="telegram-publisher-bot"
 INSTALL_DIR="/opt/$PROJECT_DIR" # Постоянная директория для установки
 CURRENT_USER="${SUDO_USER:-$USER}"
-CURRENT_TIME="2025-02-24 21:08:19" # Текущее время в UTC
+CURRENT_TIME="2025-02-24 21:49:33" # Текущее время в UTC
 
 # Цвета для вывода
 RED='\033[0;31m'
