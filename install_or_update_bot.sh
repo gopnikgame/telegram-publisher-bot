@@ -435,6 +435,7 @@ main_menu() {
 
         case $choice in
             1)
+                # Вызываем функцию manage_env_file
                 manage_env_file
                 ;;
             2)
