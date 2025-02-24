@@ -36,7 +36,7 @@ cleanup() {
 # Функция для проверки и установки зависимостей
 install_dependencies() {
     log "BLUE" "🔍 Проверка зависимостей..."
-    
+
     local packages=("git" "docker.io" "docker-compose" "nano")
     local missing_packages=()
 
@@ -85,7 +85,7 @@ fi
 cd "$TEMP_DIR/$PROJECT_DIR"
 
 # Проверяем наличие необходимых файлов
-if [ ! -f "docker/docker-compose.yml" ] || [ ! -f "scripts/install_or_update_bot.sh" ]; then
+if [ ! -f "docker/docker-compose.yml" ] || [ ! -f "scripts/install_or_update_bot.sh" ] || [ ! -f "Dockerfile" ]; then
     log "RED" "❌ Не найдены необходимые файлы проекта"
     exit 1
 fi
@@ -108,9 +108,27 @@ chmod -R 755 "$INSTALL_DIR"
 # Запускаем основной скрипт установки
 log "BLUE" "🚀 Запуск основного скрипта установки..."
 if [ -x "./scripts/install_or_update_bot.sh" ]; then
+    # Source the .env file to set environment variables
+    if [ -f ".env" ]; then
+        log "BLUE" "⚙️ Setting environment variables from .env file"
+        set -o allexport
+        source .env
+        set +o allexport
+    else
+        log "YELLOW" "⚠️ .env file not found, the container will start with empty variables!"
+    fi
     ./scripts/install_or_update_bot.sh
 else
     chmod +x "./scripts/install_or_update_bot.sh"
+    # Source the .env file to set environment variables
+    if [ -f ".env" ]; then
+        log "BLUE" "⚙️ Setting environment variables from .env file"
+        set -o allexport
+        source .env
+        set +o allexport
+    else
+        log "YELLOW" "⚠️ .env file not found, the container will start with empty variables!"
+    fi
     ./scripts/install_or_update_bot.sh
 fi
 
