@@ -7,14 +7,25 @@ services:
         - DOCKER_GID=${DOCKER_GID:-1000}
     container_name: telegram-publisher-bot
     restart: unless-stopped
+    init: true
+    stop_grace_period: 30s
+    stop_signal: SIGTERM
     volumes:
       - ./.env:/app/.env:ro
       - ./logs:/app/logs
     environment:
       - PYTHONUNBUFFERED=1
       - TZ=UTC
+      - CREATED_BY=gopnikgame
+      - CREATED_AT=2025-02-24_11:43
     logging:
       driver: "json-file"
       options:
         max-size: "10m"
         max-file: "3"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import os; exit(0 if os.path.exists('/app/logs/bot.log') else 1)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
