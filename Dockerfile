@@ -7,7 +7,6 @@ RUN groupadd -r botuser && useradd -r -g botuser botuser
 RUN apt-get update && apt-get install -y \
     gcc \
     python3-dev \
-    linux-headers-amd64 \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
@@ -23,7 +22,9 @@ COPY . .
 
 # Создаем директорию для логов и устанавливаем права
 RUN mkdir -p /app/logs && \
-    chown -R botuser:botuser /app
+    chown -R botuser:botuser /app && \
+    chmod -R 755 /app && \
+    chmod -R 777 /app/logs
 
 # Переключаемся на пользователя botuser
 USER botuser
