@@ -24,17 +24,8 @@ COPY --chown=appuser:appuser requirements.txt .
 # Переключаемся на пользователя appuser
 USER appuser
 
-# Проверяем наличие переменных окружения при запуске
-CMD if [ -f /app/.env ]; then \
-        echo "Checking .env file..."; \
-        if grep -q "^BOT_TOKEN=" /app/.env; then \
-            echo "Starting bot..."; \
-            python -m app; \
-        else \
-            echo "ERROR: BOT_TOKEN not found in .env file"; \
-            exit 1; \
-        fi; \
-    else \
-        echo "ERROR: .env file not found"; \
-        exit 1; \
-    fi
+# Добавляем скрипт для проверки и запуска
+COPY --chown=appuser:appuser docker-entrypoint.sh /app/
+RUN chmod +x /app/docker-entrypoint.sh
+
+ENTRYPOINT ["/app/docker-entrypoint.sh"]
