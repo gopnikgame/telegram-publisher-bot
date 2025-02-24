@@ -10,6 +10,8 @@ BACKUP_DIR="/opt/telegram-publisher-bot-backup"
 DOCKER_UID=$(id -u)
 DOCKER_GID=$(id -g)
 TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+CREATED_BY="gopnikgame"
+CREATED_AT="2025-02-24 11:47:18"
 
 # Цвета для вывода
 RED='\033[0;31m'
@@ -23,6 +25,23 @@ log() {
     local level=$1
     local message=$2
     echo -e "${!level}${message}${NC}"
+}
+
+# Функция для записи системной информации
+write_system_info() {
+    local info_file="$TARGET_DIR/logs/system_info.log"
+    mkdir -p "$(dirname "$info_file")"
+    
+    {
+        echo "=== System Information ==="
+        echo "Timestamp: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+        echo "User: $CREATED_BY"
+        echo "Installation Date: $CREATED_AT"
+        echo "Docker Version: $(docker --version)"
+        echo "Docker Compose Version: $(docker-compose --version)"
+        echo "System: $(uname -a)"
+        echo "========================="
+    } > "$info_file"
 }
 
 # Функция для проверки наличия команды
@@ -101,7 +120,7 @@ setup_permissions() {
     # Устанавливаем права
     chmod -R 755 "$target_dir"
     chmod -R 777 "$target_dir/logs"
-    chmod 600 "$target_dir/.env"
+    [ -f "$target_dir/.env" ] && chmod 600 "$target_dir/.env"
     
     # Устанавливаем владельца
     chown -R "${SUDO_USER:-$USER}:${SUDO_USER:-$USER}" "$target_dir"
@@ -124,6 +143,11 @@ manage_env_file() {
         fi
     fi
     
+    # Проверяем содержимое файла
+    if [ ! -s "$env_file" ]; then
+        log "YELLOW" "⚠️ Файл .env пуст"
+    fi
+    
     # Спрашиваем пользователя о редактировании
     read -r -p "Хотите отредактировать .env файл? [y/N] " response
     if [[ "$response" =~ ^([yY][eE][sS]|[yY])$ ]]; then
@@ -135,6 +159,54 @@ manage_env_file() {
     fi
 }
 
+# Функция для принудительного удаления контейнера
+force_remove_container() {
+    local container_name="telegram-publisher-bot"
+    log "YELLOW" "🔄 Принудительное удаление контейнера..."
+    
+    # Получаем PID процесса внутри контейнера
+    local container_pid=$(docker inspect --format '{{.State.Pid}}' "$container_name" 2>/dev/null || echo "")
+    
+    # Пробуем остановить мягко
+    docker stop "$container_name" &>/dev/null || true
+    sleep 2
+    
+    # Проверяем, остановился ли контейнер
+    if docker ps | grep -q "$container_name"; then
+        log "YELLOW" "⚠️ Контейнер все еще работает, применяем SIGKILL..."
+        # Сначала пробуем отправить SIGTERM напрямую процессу
+        if [ -n "$container_pid" ] && [ "$container_pid" != "0" ]; then
+            sudo kill -TERM "$container_pid" &>/dev/null || true
+            sleep 2
+        fi
+        docker kill "$container_name" &>/dev/null || true
+        sleep 2
+    fi
+    
+    # Принудительное удаление
+    docker rm -f "$container_name" &>/dev/null || true
+    
+    # Проверяем, существует ли еще контейнер
+    if docker ps -a | grep -q "$container_name"; then
+        log "RED" "❌ Не удалось удалить контейнер"
+        log "YELLOW" "⚠️ Попытка очистки Docker..."
+        
+        # Очистка Docker системы
+        docker system prune -f &>/dev/null || true
+        
+        # Последняя попытка удаления
+        if docker rm -f "$container_name" &>/dev/null; then
+            log "GREEN" "✅ Контейнер успешно удален"
+        else
+            log "RED" "❌ Критическая ошибка: невозможно удалить контейнер"
+            log "YELLOW" "⚠️ Рекомендуется перезагрузить систему"
+            return 1
+        fi
+    else
+        log "GREEN" "✅ Контейнер успешно удален"
+    fi
+}
+
 # Функция для управления контейнером
 manage_container() {
     local action=$1
@@ -142,32 +214,40 @@ manage_container() {
     
     cd "$TARGET_DIR"
     
+    # Экспортируем переменные окружения
+    export DOCKER_UID DOCKER_GID
+    export CREATED_BY CREATED_AT
+    
     case $action in
         "restart")
             log "BLUE" "🔄 Перезапуск контейнера..."
-            docker-compose down --remove-orphans
+            docker-compose down --remove-orphans --timeout 30 || force_remove_container
+            sleep 2
             docker-compose up -d
             ;;
         "stop")
             log "BLUE" "⏹️ Остановка контейнера..."
-            docker-compose down --remove-orphans
+            docker-compose down --remove-orphans --timeout 30 || force_remove_container
             ;;
         "start")
             log "BLUE" "▶️ Запуск контейнера..."
-            # Проверяем и удаляем старый контейнер если он существует
             if docker ps -a | grep -q "telegram-publisher-bot"; then
-                log "YELLOW" "🔄 Удаление существующего контейнера..."
-                docker rm -f telegram-publisher-bot
+                force_remove_container
             fi
-            # Устанавливаем переменные окружения для Docker
-            export DOCKER_UID DOCKER_GID
             docker-compose up -d
             ;;
     esac
     
-    # Проверяем результат
     if [ $? -eq 0 ]; then
         log "GREEN" "✅ Операция успешно выполнена"
+        # Ждем немного и проверяем healthcheck
+        sleep 5
+        if docker ps | grep -q "telegram-publisher-bot" && \
+           docker inspect --format='{{.State.Health.Status}}' telegram-publisher-bot 2>/dev/null | grep -q "healthy"; then
+            log "GREEN" "✅ Контейнер работает корректно"
+        else
+            log "YELLOW" "⚠️ Контейнер запущен, но healthcheck еще не пройден"
+        fi
     else
         log "RED" "❌ Ошибка при выполнении операции"
         return 1
@@ -180,8 +260,9 @@ check_bot_status() {
     
     cd "$TARGET_DIR"
     
-    if docker-compose ps | grep -q "telegram-publisher-bot"; then
-        log "GREEN" "✅ Бот успешно работает"
+    if docker ps | grep -q "telegram-publisher-bot"; then
+        local health_status=$(docker inspect --format='{{.State.Health.Status}}' telegram-publisher-bot 2>/dev/null || echo "unknown")
+        log "GREEN" "✅ Бот запущен (статус: $health_status)"
         docker-compose logs --tail=10
     else
         log "RED" "❌ Бот не запущен"
@@ -197,11 +278,14 @@ cleanup_old_files() {
     # Удаляем старые бэкапы (оставляем последние 5)
     if [ -d "$BACKUP_DIR" ]; then
         cd "$BACKUP_DIR"
-        ls -t .env_* | tail -n +6 | xargs -r rm
+        ls -t .env_* 2>/dev/null | tail -n +6 | xargs -r rm
     fi
     
     # Очищаем старые логи
     find "$TARGET_DIR/logs" -name "*.log.*" -mtime +7 -delete 2>/dev/null || true
+    
+    # Очищаем старые Docker логи
+    docker system prune -f --volumes >/dev/null 2>&1 || true
     
     log "GREEN" "✅ Очистка завершена"
 }
@@ -241,6 +325,9 @@ install_dependencies
 
 # Создаем/обновляем целевую директорию
 mkdir -p "$TARGET_DIR"
+
+# Записываем системную информацию
+write_system_info
 
 # Интерактивное меню
 while true; do
