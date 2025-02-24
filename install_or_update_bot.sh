@@ -11,6 +11,7 @@ DOCKER_GID=$(id -g)
 TIMESTAMP=$(date +%Y%m%d_%H%M%S)
 CREATED_BY="gopnikgame"
 CREATED_AT="2025-02-24 19:32:08"
+PROJECT_DIR="telegram-publisher-bot" # Имя директории, которая будет создана после клонирования
 
 # Цвета для вывода
 RED='\033[0;31m'
@@ -30,7 +31,7 @@ log() {
 write_system_info() {
     local info_file="./logs/system_info.log"
     mkdir -p "$(dirname "$info_file")"
-    
+
     {
         echo "=== System Information ==="
         echo "Timestamp: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
@@ -61,29 +62,29 @@ check_command() {
 # Функция для установки зависимостей
 install_dependencies() {
     log "BLUE" "🔍 Проверка зависимостей..."
-    
+
     local dependencies=(
         "git:git"
         "docker:docker.io"
         "docker-compose:docker-compose"
     )
-    
+
     local missing_deps=()
-    
+
     for dep in "${dependencies[@]}"; do
         IFS=":" read -r cmd pkg <<< "$dep"
         if ! command -v "$cmd" &> /dev/null; then
             missing_deps+=("$pkg")
         fi
     done
-    
+
     if [ ${#missing_deps[@]} -ne 0 ]; then
         log "YELLOW" "⚠️ Отсутствуют необходимые зависимости"
         log "BLUE" "📦 Установка зависимостей..."
         sudo apt-get update
         sudo apt-get install -y "${missing_deps[@]}"
     fi
-    
+
     log "GREEN" "✅ Все зависимости установлены"
 }
 
@@ -92,7 +93,7 @@ backup_restore_env() {
     local action=$1  # "backup" или "restore"
     local env_file=".env"
     local backup_file="$BACKUP_DIR/.env_$TIMESTAMP"
-    
+
     if [ "$action" = "backup" ] && [ -f "$env_file" ]; then
         log "BLUE" "📑 Создание резервной копии .env файла..."
         mkdir -p "$BACKUP_DIR"
@@ -116,19 +117,19 @@ backup_restore_env() {
 # Функция для настройки прав доступа
 setup_permissions() {
     log "BLUE" "🔧 Настройка прав доступа..."
-    
+
     # Создаем директории
     mkdir -p "./logs"
     mkdir -p "$BACKUP_DIR"
-    
+
     # Устанавливаем права
     chmod -R 755 .
     chmod -R 777 "./logs"
     [ -f ".env" ] && chmod 600 ".env"
-    
+
     # Устанавливаем владельца
     chown -R "${SUDO_USER:-$USER}:${SUDO_USER:-$USER}" .
-    
+
     log "GREEN" "✅ Права доступа настроены"
 }
 
@@ -137,9 +138,9 @@ manage_env_file() {
     local env_file=".env"
     local env_example=".env.example"
     local created=false
-    
+
     log "BLUE" "📝 Управление конфигурацией .env..."
-    
+
     # Проверяем существование файлов
     if [ ! -f "$env_file" ]; then
         if [ -f "$env_example" ]; then
@@ -198,7 +199,7 @@ EOL
         for param in "${missing_params[@]}"; do
             echo "   • $param"
         done
-        
+
         read -r -p "Настроить параметры сейчас? [Y/n] " response
         response=${response:-Y}
         if [[ "$response" =~ ^([yY][eE][sS]|[yY])$ ]]; then
@@ -216,7 +217,7 @@ EOL
     # Устанавливаем правильные права доступа
     chmod 600 "$env_file"
     chown "${SUDO_USER:-$USER}:${SUDO_USER:-$USER}" "$env_file"
-    
+
     log "GREEN" "✅ Конфигурация .env завершена"
     return 0
 }
@@ -225,13 +226,13 @@ EOL
 force_remove_container() {
     local container_name="telegram-publisher-bot"
     log "YELLOW" "🔄 Принудительное удаление контейнера..."
-    
+
     local container_pid
     container_pid=$(docker inspect --format '{{.State.Pid}}' "$container_name" 2>/dev/null || echo "")
-    
+
     docker stop "$container_name" &>/dev/null || true
     sleep 2
-    
+
     if docker ps | grep -q "$container_name"; then
         log "YELLOW" "⚠️ Контейнер все еще работает, применяем SIGKILL..."
         if [ -n "$container_pid" ] && [ "$container_pid" != "0" ]; then
@@ -240,9 +241,9 @@ force_remove_container() {
         fi
         docker kill "$container_name" &>/dev/null || true
     fi
-    
+
     docker rm -f "$container_name" &>/dev/null || true
-    
+
     if ! docker ps -a | grep -q "$container_name"; then
         log "GREEN" "✅ Контейнер успешно удален"
     else
@@ -266,11 +267,11 @@ docker_compose_cmd() {
 manage_container() {
     local action=$1
     log "BLUE" "🐳 Управление контейнером..."
-    
+
     export DOCKER_UID DOCKER_GID
     export CREATED_BY="gopnikgame"
     export CREATED_AT="2025-02-24 19:33:35"
-    
+
     case $action in
         "restart")
             log "BLUE" "🔄 Перезапуск контейнера..."
@@ -289,17 +290,17 @@ manage_container() {
             docker_compose_cmd up -d
             ;;
     esac
-    
+
     if [ "$action" = "start" ] || [ "$action" = "restart" ]; then
         log "BLUE" "⏳ Ожидание запуска бота..."
         sleep 5
-        
+
         if ! docker ps | grep -q "telegram-publisher-bot"; then
             log "RED" "❌ Ошибка запуска контейнера"
             docker_compose_cmd logs
             return 1
         fi
-        
+
         log "GREEN" "✅ Контейнер запущен"
         docker_compose_cmd logs --tail=10
     fi
@@ -308,7 +309,7 @@ manage_container() {
 # Функция для проверки статуса бота
 check_bot_status() {
     log "BLUE" "🔍 Проверка статуса бота..."
-    
+
     if docker ps | grep -q "telegram-publisher-bot"; then
         log "GREEN" "✅ Бот запущен"
         docker_compose_cmd logs --tail=10
@@ -321,24 +322,24 @@ check_bot_status() {
 # Функция для очистки старых логов и бэкапов
 cleanup_old_files() {
     log "BLUE" "🧹 Очистка старых файлов..."
-    
+
     if [ -d "$BACKUP_DIR" ]; then
         cd "$BACKUP_DIR"
         ls -t .env_* 2>/dev/null | tail -n +6 | xargs -r rm
         cd ..
     fi
-    
+
     find "./logs" -name "*.log.*" -mtime +7 -delete 2>/dev/null || true
-    
+
     docker system prune -f --volumes >/dev/null 2>&1 || true
-    
+
     log "GREEN" "✅ Очистка завершена"
 }
 
 # Функция для проверки Docker
 check_docker() {
     log "BLUE" "🔍 Проверка Docker..."
-    
+
     if ! docker info >/dev/null 2>&1; then
         log "YELLOW" "⚠️ Docker демон не запущен"
         if systemctl is-active docker >/dev/null 2>&1; then
@@ -346,11 +347,11 @@ check_docker() {
             sudo systemctl start docker
             sleep 3
         else
-            log "RED" "❌ Docker не установлен или не настроен"
+            log "RED" "❌ Docker ��е установлен или не настроен"
             return 1
         fi
     fi
-    
+
     if ! docker ps >/dev/null 2>&1; then
         log "YELLOW" "⚠️ Недостаточно прав для работы с Docker"
         if ! groups | grep -q docker; then
@@ -360,7 +361,7 @@ check_docker() {
             return 1
         fi
     fi
-    
+
     log "GREEN" "✅ Docker настроен корректно"
     return 0
 }
@@ -368,19 +369,19 @@ check_docker() {
 # Функция настройки репозитория
 setup_repository() {
     log "BLUE" "🔧 Настройка репозитория..."
-    
+
     if ! command -v git &>/dev/null; then
         log "RED" "❌ Git не установлен"
         return 1
     fi
-    
+
     if [ -z "$(git config --global user.name)" ]; then
         git config --global user.name "Telegram Publisher Bot"
     fi
     if [ -z "$(git config --global user.email)" ]; then
         git config --global user.email "bot@localhost"
     fi
-    
+
     if [ ! -f ".gitignore" ]; then
         cat > ".gitignore" << EOL
 .env
@@ -392,7 +393,7 @@ __pycache__/
 EOL
         log "GREEN" "✅ Создан .gitignore файл"
     fi
-    
+
     log "GREEN" "✅ Репозиторий настроен"
     return 0
 }
@@ -400,9 +401,9 @@ EOL
 # Функция для обновления репозитория
 update_repo() {
     log "BLUE" "🔄 Обновление репозитория..."
-    
+
     backup_restore_env "backup"
-    
+
     if [ -d ".git" ]; then
         git fetch
         git reset --hard origin/main
@@ -411,7 +412,7 @@ update_repo() {
         git clone "$REPO_URL" .
         log "GREEN" "✅ Репозиторий склонирован"
     fi
-    
+
     backup_restore_env "restore"
 }
 
@@ -429,9 +430,9 @@ main_menu() {
         echo "8. ⬆️ Обновить из репозитория"
         echo "9. 🧹 Очистить старые логи и бэкапы"
         echo "10. 🚪 Выйти"
-        
+
         read -r -p "Выберите действие (1-10): " choice
-        
+
         case $choice in
             1)
                 manage_env_file
@@ -490,30 +491,45 @@ main_menu() {
     done
 }
 
-if [ ! -f "install_or_update_bot.sh" ]; then
-    log "RED" "❌ Скрипт должен быть запущен из корневой директории проекта"
-    exit 1
-fi
 
-log "GREEN" "🤖 Установка/обновление Telegram Publisher Bot"
-
-if [ "$EUID" -ne 0 ]; then 
+# Проверяем, что скрипт запущен с правами root
+if [ "$EUID" -ne 0 ]; then
     log "RED" "❌ Запустите скрипт с правами root (sudo)"
     exit 1
 fi
 
+# Проверяем и устанавливаем зависимости
 install_dependencies
 
+# Клонируем репозиторий, если его нет
+if [ ! -d "./.git" ]; then
+    log "BLUE" "⬇️ Клонирование репозитория..."
+    git clone "$REPO_URL" .
+else
+    log "BLUE" "🔄 Репозиторий уже существует. Обновление..."
+    update_repo
+fi
+
+# Проверяем наличие необходимых файлов
+if [ ! -f "docker-compose.yml" ] && [ ! -f ".env.example" ]; then
+    log "RED" "❌ Не найдены необходимые файлы проекта (docker-compose.yml или .env.example)"
+    exit 1
+fi
+
+# Проверяем Docker
 if ! check_docker; then
     log "RED" "❌ Ошибка настройки Docker"
     exit 1
 fi
 
+# Настраиваем репозиторий
 if ! setup_repository; then
     log "RED" "❌ Ошибка настройки репозитория"
     exit 1
 fi
 
+# Записываем системную информацию
 write_system_info
 
+# Запускаем главное меню
 main_menu
