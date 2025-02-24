@@ -1,203 +1,265 @@
 #!/bin/bash
 
-# Текущая дата и время в UTC для меток
-CREATED_AT="2025-02-24 18:04:30"
-CREATED_BY="gopnikgame"
+# Включаем строгий режим
+set -euo pipefail
+
+# Конфигурация
 REPO_URL="https://github.com/gopnikgame/telegram-publisher-bot.git"
+BACKUP_DIR="./backups"
+DOCKER_UID=$(id -u)
+DOCKER_GID=$(id -g)
+TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+CREATED_BY="gopnikgame"
+CREATED_AT="2025-02-24 19:32:08"
 
 # Цвета для вывода
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
-NC='\033[0m'
+NC='\033[0m' # No Color
 
 # Функция для логирования
 log() {
-    local color=$1
+    local level=$1
     local message=$2
-    echo -e "${!color}${message}${NC}"
+    echo -e "${!level}${message}${NC}"
 }
 
-# Проверка наличия Docker
-check_docker() {
-    if ! command -v docker &> /dev/null; then
-        log "RED" "❌ Docker не установлен"
-        return 1
-    fi
-    if ! command -v docker-compose &> /dev/null; then
-        log "RED" "❌ Docker Compose не установлен"
-        return 1
-    fi
-    return 0
-}
-
-# Функция для работы с git
-setup_repository() {
-    log "BLUE" "🔍 Проверка репозитория..."
+# Функция для записи системной информации
+write_system_info() {
+    local info_file="./logs/system_info.log"
+    mkdir -p "$(dirname "$info_file")"
     
-    # Проверяем, есть ли .git директория
-    if [ ! -d ".git" ]; then
-        log "BLUE" "📥 Клонирование репозитория..."
-        git clone "$REPO_URL" . || {
-            log "RED" "❌ Ошибка клонирования репозитория"
-            return 1
-        }
-        log "GREEN" "✅ Репозиторий успешно клонирован"
-    else
-        # Если это git репозиторий, проверяем remote
-        local current_remote
-        current_remote=$(git remote get-url origin 2>/dev/null)
-        
-        if [ "$current_remote" != "$REPO_URL" ]; then
-            log "YELLOW" "⚠️ Неверный репозиторий"
-            log "BLUE" "🔄 Настройка правильного репозитория..."
-            git remote set-url origin "$REPO_URL" || {
-                log "RED" "❌ Ошибка настройки репозитория"
-                return 1
-            }
+    {
+        echo "=== System Information ==="
+        echo "Timestamp: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+        echo "User: $CREATED_BY"
+        echo "Installation Date: $CREATED_AT"
+        echo "Docker Version: $(docker --version)"
+        # Проверяем наличие docker compose plugin
+        if command -v docker &> /dev/null && docker compose version &> /dev/null; then
+            echo "Docker Compose Version: $(docker compose version)"
+        else
+            echo "Docker Compose Version: $(docker-compose --version 2>/dev/null || echo 'Not found')"
         fi
-    fi
-    
-    # Получаем последние изменения
-    log "BLUE" "🔄 Обновление репозитория..."
-    git fetch origin || {
-        log "RED" "❌ Ошибка получения обновлений"
-        return 1
-    }
-    
-    # Проверяем наличие изменений
-    local local_head
-    local remote_head
-    local_head=$(git rev-parse HEAD)
-    remote_head=$(git rev-parse origin/main)
-    
-    if [ "$local_head" != "$remote_head" ]; then
-        log "BLUE" "📥 Применение обновлений..."
-        git pull origin main || {
-            log "RED" "❌ Ошибка обновления репозитория"
-            return 1
-        }
-        log "GREEN" "✅ Репозиторий успешно обновлен"
-        return 2  # Код 2 означает, что были обновления
-    fi
-    
-    log "GREEN" "✅ Репозиторий в актуальном состоянии"
-    return 0
+        echo "System: $(uname -a)"
+        echo "========================="
+    } > "$info_file"
 }
 
-# Функция для проверки и создания файлов
-check_and_create_files() {
-    log "BLUE" "🔍 Проверка файлов проекта..."
-    
-    # Проверяем/создаем директорию для логов
-    if [ ! -d logs ]; then
-        log "BLUE" "📁 Создание директории для логов..."
-        mkdir -p logs
-        log "GREEN" "✅ Директория logs создана"
+# Функция для проверки наличия команды
+check_command() {
+    if ! command -v "$1" &> /dev/null; then
+        log "RED" "❌ Ошибка: команда $1 не найдена"
+        log "YELLOW" "📦 Установите необходимые зависимости:"
+        log "YELLOW" "sudo apt-get update && sudo apt-get install -y $2"
+        exit 1
     fi
+}
+
+# Функция для установки зависимостей
+install_dependencies() {
+    log "BLUE" "🔍 Проверка зависимостей..."
     
-    # Проверяем наличие основных файлов
-    local required_files=("docker-compose.yml" "Dockerfile" "requirements.txt")
-    local missing_files=false
+    local dependencies=(
+        "git:git"
+        "docker:docker.io"
+        "docker-compose:docker-compose"
+    )
     
-    for file in "${required_files[@]}"; do
-        if [ ! -f "$file" ]; then
-            missing_files=true
-            log "YELLOW" "⚠️ Отсутствует файл: $file"
+    local missing_deps=()
+    
+    for dep in "${dependencies[@]}"; do
+        IFS=":" read -r cmd pkg <<< "$dep"
+        if ! command -v "$cmd" &> /dev/null; then
+            missing_deps+=("$pkg")
         fi
     done
     
-    if [ "$missing_files" = true ]; then
-        log "BLUE" "🔄 Обновление файлов из репозитория..."
-        setup_repository || {
-            log "RED" "❌ Ошибка получения файлов из репозитория"
-            exit 1
-        }
+    if [ ${#missing_deps[@]} -ne 0 ]; then
+        log "YELLOW" "⚠️ Отсутствуют необходимые зависимости"
+        log "BLUE" "📦 Установка зависимостей..."
+        sudo apt-get update
+        sudo apt-get install -y "${missing_deps[@]}"
     fi
     
-    log "GREEN" "✅ Все необходимые файлы проверены"
+    log "GREEN" "✅ Все зависимости установлены"
 }
 
-# Функция для обновления конфигурации
-update_config() {
-    log "BLUE" "🔧 Настройка конфигурации..."
+# Функция для backup/restore .env файла
+backup_restore_env() {
+    local action=$1  # "backup" или "restore"
+    local env_file=".env"
+    local backup_file="$BACKUP_DIR/.env_$TIMESTAMP"
     
-    # Создаем .env если его нет
-    if [ ! -f .env ]; then
-        cat > .env << EOL
+    if [ "$action" = "backup" ] && [ -f "$env_file" ]; then
+        log "BLUE" "📑 Создание резервной копии .env файла..."
+        mkdir -p "$BACKUP_DIR"
+        cp "$env_file" "$backup_file"
+        log "GREEN" "✅ Резервная копия .env создана: $backup_file"
+    elif [ "$action" = "restore" ]; then
+        if [ -f "$backup_file" ]; then
+            log "BLUE" "📑 Восстановление .env файла..."
+            cp "$backup_file" "$env_file"
+            log "GREEN" "✅ .env файл восстановлен из: $backup_file"
+        elif [ -f "$BACKUP_DIR/.env_"* ]; then
+            local latest_backup
+            latest_backup=$(ls -t "$BACKUP_DIR/.env_"* | head -n1)
+            log "YELLOW" "⚠️ Восстановление из последнего бэкапа: $latest_backup"
+            cp "$latest_backup" "$env_file"
+            log "GREEN" "✅ .env файл восстановлен"
+        fi
+    fi
+}
+
+# Функция для настройки прав доступа
+setup_permissions() {
+    log "BLUE" "🔧 Настройка прав доступа..."
+    
+    # Создаем директории
+    mkdir -p "./logs"
+    mkdir -p "$BACKUP_DIR"
+    
+    # Устанавливаем права
+    chmod -R 755 .
+    chmod -R 777 "./logs"
+    [ -f ".env" ] && chmod 600 ".env"
+    
+    # Устанавливаем владельца
+    chown -R "${SUDO_USER:-$USER}:${SUDO_USER:-$USER}" .
+    
+    log "GREEN" "✅ Права доступа настроены"
+}
+
+# Функция для управления конфигурацией .env
+manage_env_file() {
+    local env_file=".env"
+    local env_example=".env.example"
+    local created=false
+    
+    log "BLUE" "📝 Управление конфигурацией .env..."
+    
+    # Проверяем существование файлов
+    if [ ! -f "$env_file" ]; then
+        if [ -f "$env_example" ]; then
+            cp "$env_example" "$env_file"
+            created=true
+            log "GREEN" "✅ Создан новый .env файл из примера"
+        else
+            log "YELLOW" "⚠️ Файл .env.example не найден, создаем базовый .env"
+            cat > "$env_file" << EOL
+# Конфигурация бота
 BOT_TOKEN=
 ADMIN_IDS=
 CHANNEL_ID=
+
+# Настройки форматирования
 DEFAULT_FORMAT=markdown
 MAX_FILE_SIZE=20971520
+
+# Ссылки
 MAIN_BOT_NAME=Основной бот
 MAIN_BOT_LINK=
 SUPPORT_BOT_NAME=Техподдержка
 SUPPORT_BOT_LINK=
 CHANNEL_NAME=Канал проекта
 CHANNEL_LINK=
+
+# Тестовый режим
 TEST_MODE=false
 TEST_CHAT_ID=
+
+# Прокси (если нужен)
 HTTPS_PROXY=
 EOL
+            created=true
+            log "YELLOW" "⚠️ Создан базовый .env файл"
+        fi
+    fi
+
+    # Проверяем и управляем параметрами
+    local missing_params=()
+    while IFS= read -r line; do
+        if [[ $line =~ ^BOT_TOKEN=$ ]]; then
+            missing_params+=("BOT_TOKEN")
+        fi
+        if [[ $line =~ ^ADMIN_IDS=$ ]]; then
+            missing_params+=("ADMIN_IDS")
+        fi
+        if [[ $line =~ ^CHANNEL_ID=$ ]]; then
+            missing_params+=("CHANNEL_ID")
+        fi
+    done < "$env_file"
+
+    # Обработка отсутствующих параметров
+    if [ ${#missing_params[@]} -gt 0 ] || [ "$created" = true ]; then
+        log "YELLOW" "⚠️ Необходимо настроить следующие параметры:"
+        for param in "${missing_params[@]}"; do
+            echo "   • $param"
+        done
+        
+        read -r -p "Настроить параметры сейчас? [Y/n] " response
+        response=${response:-Y}
+        if [[ "$response" =~ ^([yY][eE][sS]|[yY])$ ]]; then
+            if command -v nano &> /dev/null; then
+                nano "$env_file"
+            else
+                vi "$env_file"
+            fi
+        else
+            log "RED" "❌ Бот не будет работать без настроенных параметров"
+            return 1
+        fi
+    fi
+
+    # Устанавливаем правильные права доступа
+    chmod 600 "$env_file"
+    chown "${SUDO_USER:-$USER}:${SUDO_USER:-$USER}" "$env_file"
+    
+    log "GREEN" "✅ Конфигурация .env завершена"
+    return 0
+}
+
+# Функция для принудительного удаления контейнера
+force_remove_container() {
+    local container_name="telegram-publisher-bot"
+    log "YELLOW" "🔄 Принудительное удаление контейнера..."
+    
+    local container_pid
+    container_pid=$(docker inspect --format '{{.State.Pid}}' "$container_name" 2>/dev/null || echo "")
+    
+    docker stop "$container_name" &>/dev/null || true
+    sleep 2
+    
+    if docker ps | grep -q "$container_name"; then
+        log "YELLOW" "⚠️ Контейнер все еще работает, применяем SIGKILL..."
+        if [ -n "$container_pid" ] && [ "$container_pid" != "0" ]; then
+            sudo kill -TERM "$container_pid" &>/dev/null || true
+            sleep 2
+        fi
+        docker kill "$container_name" &>/dev/null || true
     fi
     
-    # Редактируем конфигурацию
-    while true; do
-        log "BLUE" "📝 Текущие настройки:"
-        while IFS='=' read -r key value; do
-            if [[ $key == "BOT_TOKEN" ]]; then
-                if [ -n "$value" ]; then
-                    log "GREEN" "✓ BOT_TOKEN: установлен (длина: ${#value} символов)"
-                else
-                    log "RED" "✗ BOT_TOKEN: не установлен"
-                fi
-            else
-                log "BLUE" "$key: $value"
-            fi
-        done < .env
-        
-        log "YELLOW" "
-Выберите действие:
-1. Изменить BOT_TOKEN
-2. Изменить ADMIN_IDS
-3. Изменить CHANNEL_ID
-4. Изменить другие настройки
-5. Сохранить и выйти"
-        
-        read -p "Ваш выбор: " choice
-        case $choice in
-            1)
-                read -p "Введите BOT_TOKEN: " token
-                sed -i "s/^BOT_TOKEN=.*/BOT_TOKEN=$token/" .env
-                ;;
-            2)
-                read -p "Введите ADMIN_IDS (через запятую): " admins
-                sed -i "s/^ADMIN_IDS=.*/ADMIN_IDS=$admins/" .env
-                ;;
-            3)
-                read -p "Введите CHANNEL_ID: " channel
-                sed -i "s/^CHANNEL_ID=.*/CHANNEL_ID=$channel/" .env
-                ;;
-            4)
-                ${EDITOR:-nano} .env
-                ;;
-            5)
-                break
-                ;;
-            *)
-                log "RED" "❌ Неверный выбор"
-                ;;
-        esac
-    done
+    docker rm -f "$container_name" &>/dev/null || true
     
-    # Устанавливаем права доступа
-    log "BLUE" "🔧 Настройка прав доступа..."
-    chmod 600 .env
-    log "GREEN" "✅ Права доступа настроены"
-    
-    return 0
+    if ! docker ps -a | grep -q "$container_name"; then
+        log "GREEN" "✅ Контейнер успешно удален"
+    else
+        log "RED" "❌ Критическая ошибка: невозможно удалить контейнер"
+        return 1
+    fi
+}
+
+# Функция для вызова docker compose
+docker_compose_cmd() {
+    if command -v docker &> /dev/null && docker compose version &> /dev/null; then
+        # Используем встроенную команду docker compose
+        docker compose "$@"
+    else
+        # Используем старый docker-compose
+        docker-compose "$@"
+    fi
 }
 
 # Функция для управления контейнером
@@ -205,159 +267,253 @@ manage_container() {
     local action=$1
     log "BLUE" "🐳 Управление контейнером..."
     
+    export DOCKER_UID DOCKER_GID
+    export CREATED_BY="gopnikgame"
+    export CREATED_AT="2025-02-24 19:33:35"
+    
     case $action in
         "restart")
             log "BLUE" "🔄 Перезапуск контейнера..."
-            docker-compose down
-            docker-compose up -d
+            docker_compose_cmd down --remove-orphans || force_remove_container
+            docker_compose_cmd up -d
             ;;
         "stop")
             log "BLUE" "⏹️ Остановка контейнера..."
-            docker-compose down
+            docker_compose_cmd down --remove-orphans || force_remove_container
             ;;
         "start")
-            # Проверка конфигурации
-            if [ ! -f .env ]; then
-                log "RED" "❌ Файл .env не найден"
-                return 1
-            fi
-
-            # Проверяем BOT_TOKEN
-            if ! grep -q "^BOT_TOKEN=..*" .env; then
-                log "RED" "❌ BOT_TOKEN не установлен в .env"
-                return 1
-            fi
-
-            # Запуск контейнера
             log "BLUE" "▶️ Запуск контейнера..."
             if docker ps -a | grep -q "telegram-publisher-bot"; then
                 force_remove_container
             fi
-            docker-compose up -d
+            docker_compose_cmd up -d
             ;;
     esac
     
-    local exit_code=$?
-    if [ $exit_code -eq 0 ]; then
-        log "GREEN" "✅ Операция успешно выполнена"
+    if [ "$action" = "start" ] || [ "$action" = "restart" ]; then
+        log "BLUE" "⏳ Ожидание запуска бота..."
+        sleep 5
         
-        if [ "$action" = "start" ] || [ "$action" = "restart" ]; then
-            local max_attempts=6
-            local attempt=1
-            
-            while [ $attempt -le $max_attempts ]; do
-                log "BLUE" "🔍 Проверка состояния контейнера (попытка $attempt из $max_attempts)..."
-                sleep 5
-                
-                if ! docker ps | grep -q "telegram-publisher-bot"; then
-                    log "RED" "❌ Контейнер не запущен"
-                    return 1
-                fi
-                
-                if docker logs telegram-publisher-bot 2>&1 | grep -q "BOT_TOKEN не установлен"; then
-                    log "RED" "❌ Контейнер в нерабочем состоянии"
-                    docker-compose logs
-                    return 1
-                fi
-                
-                if docker logs telegram-publisher-bot 2>&1 | grep -q "Бот успешно запущен"; then
-                    log "GREEN" "✅ Контейнер работает корректно"
-                    break
-                fi
-                
-                log "YELLOW" "⚠️ Контейнер запускается..."
-                attempt=$((attempt + 1))
-            done
-            
-            if [ $attempt -gt $max_attempts ]; then
-                log "RED" "❌ Превышено время ожидания запуска"
-                docker-compose logs
-                return 1
-            fi
+        if ! docker ps | grep -q "telegram-publisher-bot"; then
+            log "RED" "❌ Ошибка запуска контейнера"
+            docker_compose_cmd logs
+            return 1
         fi
+        
+        log "GREEN" "✅ Контейнер запущен"
+        docker_compose_cmd logs --tail=10
+    fi
+}
+
+# Функция для проверки статуса бота
+check_bot_status() {
+    log "BLUE" "🔍 Проверка статуса бота..."
+    
+    if docker ps | grep -q "telegram-publisher-bot"; then
+        log "GREEN" "✅ Бот запущен"
+        docker_compose_cmd logs --tail=10
     else
-        log "RED" "❌ Ошибка при выполнении операции (код: $exit_code)"
-        docker-compose logs
-        return 1
+        log "RED" "❌ Бот не запущен"
+        docker_compose_cmd logs --tail=20
+    fi
+}
+
+# Функция для очистки старых логов и бэкапов
+cleanup_old_files() {
+    log "BLUE" "🧹 Очистка старых файлов..."
+    
+    if [ -d "$BACKUP_DIR" ]; then
+        cd "$BACKUP_DIR"
+        ls -t .env_* 2>/dev/null | tail -n +6 | xargs -r rm
+        cd ..
     fi
     
+    find "./logs" -name "*.log.*" -mtime +7 -delete 2>/dev/null || true
+    
+    docker system prune -f --volumes >/dev/null 2>&1 || true
+    
+    log "GREEN" "✅ Очистка завершена"
+}
+
+# Функция для проверки Docker
+check_docker() {
+    log "BLUE" "🔍 Проверка Docker..."
+    
+    if ! docker info >/dev/null 2>&1; then
+        log "YELLOW" "⚠️ Docker демон не запущен"
+        if systemctl is-active docker >/dev/null 2>&1; then
+            log "BLUE" "🔄 Запуск Docker демона..."
+            sudo systemctl start docker
+            sleep 3
+        else
+            log "RED" "❌ Docker не установлен или не настроен"
+            return 1
+        fi
+    fi
+    
+    if ! docker ps >/dev/null 2>&1; then
+        log "YELLOW" "⚠️ Недостаточно прав для работы с Docker"
+        if ! groups | grep -q docker; then
+            log "BLUE" "🔧 Добавление пользователя в группу docker..."
+            sudo usermod -aG docker "${SUDO_USER:-$USER}"
+            log "YELLOW" "⚠️ Требуется перезайти в систему"
+            return 1
+        fi
+    fi
+    
+    log "GREEN" "✅ Docker настроен корректно"
     return 0
 }
 
-# Функция для принудительного удаления контейнера
-force_remove_container() {
-    log "BLUE" "🔄 Принудительное удаление контейнера..."
-    docker rm -f telegram-publisher-bot > /dev/null 2>&1
-    log "GREEN" "✅ Контейнер успешно удален"
+# Функция настройки репозитория
+setup_repository() {
+    log "BLUE" "🔧 Настройка репозитория..."
+    
+    if ! command -v git &>/dev/null; then
+        log "RED" "❌ Git не установлен"
+        return 1
+    fi
+    
+    if [ -z "$(git config --global user.name)" ]; then
+        git config --global user.name "Telegram Publisher Bot"
+    fi
+    if [ -z "$(git config --global user.email)" ]; then
+        git config --global user.email "bot@localhost"
+    fi
+    
+    if [ ! -f ".gitignore" ]; then
+        cat > ".gitignore" << EOL
+.env
+logs/
+backups/
+__pycache__/
+*.pyc
+.DS_Store
+EOL
+        log "GREEN" "✅ Создан .gitignore файл"
+    fi
+    
+    log "GREEN" "✅ Репозиторий настроен"
+    return 0
 }
 
-# Основное меню
+# Функция для обновления репозитория
+update_repo() {
+    log "BLUE" "🔄 Обновление репозитория..."
+    
+    backup_restore_env "backup"
+    
+    if [ -d ".git" ]; then
+        git fetch
+        git reset --hard origin/main
+        log "GREEN" "✅ Репозиторий обновлен"
+    else
+        git clone "$REPO_URL" .
+        log "GREEN" "✅ Репозиторий склонирован"
+    fi
+    
+    backup_restore_env "restore"
+}
+
+# Функция главного меню
 main_menu() {
     while true; do
-        log "BLUE" "
-🤖 Telegram Publisher Bot - Управление (Автор: $CREATED_BY, Обновлено: $CREATED_AT)
-
-Выберите действие:
-1. Настроить конфигурацию
-2. Запустить бота
-3. Перезапустить бота
-4. Остановить бота
-5. Показать логи
-6. Обновить бота
-7. Выход"
+        echo -e "\n📱 Telegram Publisher Bot - Меню установки\n"
+        echo "1. 📝 Создать или редактировать .env файл"
+        echo "2. 🚀 Собрать и запустить бота"
+        echo "3. 📊 Показать логи (все)"
+        echo "4. ❌ Показать логи ошибок"
+        echo "5. 🔄 Перезапустить бота"
+        echo "6. ⏹️ Остановить бота"
+        echo "7. 📈 Статус бота"
+        echo "8. ⬆️ Обновить из репозитория"
+        echo "9. 🧹 Очистить старые логи и бэкапы"
+        echo "10. 🚪 Выйти"
         
-        read -p "Ваш выбор: " choice
+        read -r -p "Выберите действие (1-10): " choice
+        
         case $choice in
             1)
-                update_config
+                manage_env_file
                 ;;
             2)
-                check_and_create_files
-                manage_container "start"
-                ;;
-            3)
-                check_and_create_files
-                manage_container "restart"
-                ;;
-            4)
-                manage_container "stop"
-                ;;
-            5)
-                docker-compose logs --tail=100 -f
-                ;;
-            6)
-                log "BLUE" "🔄 Обновление бота..."
-                setup_repository
-                update_status=$?
-                
-                if [ $update_status -eq 1 ]; then
-                    log "RED" "❌ Ошибка обновления"
+                log "BLUE" "🚀 Запуск установки..."
+                update_repo
+                if ! manage_env_file; then
+                    log "RED" "❌ Установка прервана из-за проблем с конфигурацией"
                     continue
                 fi
-                
-                if [ $update_status -eq 2 ]; then
-                    log "BLUE" "🏗️ Пересборка контейнера..."
-                    docker-compose build --no-cache
-                    manage_container "restart"
-                else
-                    log "GREEN" "✅ Обновление не требуется"
-                fi
+                setup_permissions
+                manage_container "start"
+                check_bot_status
+                ;;
+            3)
+                log "BLUE" "📜 Показ всех логов (Ctrl+C для выхода):"
+                tail -f "./logs/bot.log"
+                ;;
+            4)
+                log "BLUE" "❌ Показ логов ошибок (Ctrl+C для выхода):"
+                tail -f "./logs/error.log"
+                ;;
+            5)
+                manage_container "restart"
+                check_bot_status
+                ;;
+            6)
+                manage_container "stop"
+                log "GREEN" "✅ Бот остановлен!"
                 ;;
             7)
+                check_bot_status
+                ;;
+            8)
+                update_repo
+                setup_permissions
+                log "GREEN" "✅ Репозиторий обновлен!"
+                read -r -p "Хотите перезапустить бота? [y/N] " response
+                if [[ "$response" =~ ^([yY][eE][sS]|[yY])$ ]]; then
+                    manage_container "restart"
+                    check_bot_status
+                fi
+                ;;
+            9)
+                cleanup_old_files
+                ;;
+            10)
                 log "GREEN" "👋 До свидания!"
                 exit 0
                 ;;
             *)
-                log "RED" "❌ Неверный выбор"
+                log "RED" "❌ Неверный выбор. Попробуйте снова."
                 ;;
         esac
     done
 }
 
-# Проверяем наличие Docker
-if ! check_docker; then
+if [ ! -f "install_or_update_bot.sh" ]; then
+    log "RED" "❌ Скрипт должен быть запущен из корневой директории проекта"
     exit 1
 fi
 
-# Запускаем основное меню
+log "GREEN" "🤖 Установка/обновление Telegram Publisher Bot"
+
+if [ "$EUID" -ne 0 ]; then 
+    log "RED" "❌ Запустите скрипт с правами root (sudo)"
+    exit 1
+fi
+
+install_dependencies
+
+if ! check_docker; then
+    log "RED" "❌ Ошибка настройки Docker"
+    exit 1
+fi
+
+if ! setup_repository; then
+    log "RED" "❌ Ошибка настройки репозитория"
+    exit 1
+fi
+
+write_system_info
+
 main_menu
