@@ -3,8 +3,8 @@
 set -e  # Останавливаем скрипт при любой ошибке
 
 # Получаем текущего пользователя и его группу
-CURRENT_UID=$(id -u)
-CURRENT_GID=$(id -g)
+DOCKER_UID=$(id -u)
+DOCKER_GID=$(id -g)
 
 # Функция для проверки наличия команды в системе
 function check_command() {
@@ -98,9 +98,9 @@ fi
 
 cd "$TARGET_DIR" || exit
 
-# Экспорт переменных окружения для docker-compose
-export UID=$CURRENT_UID
-export GID=$CURRENT_GID
+# Экспорт переменных окружения для docker-compose с новыми именами
+export DOCKER_UID
+export DOCKER_GID
 
 # Функция для создания или редактирования .env файла
 function manage_env_file() {
