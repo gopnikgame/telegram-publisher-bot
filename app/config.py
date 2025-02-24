@@ -2,20 +2,24 @@ import os
 from pathlib import Path
 from dotenv import load_dotenv
 
+# Явно указываем путь к .env файлу
+ENV_PATH = Path('/app/.env')
+
 def load_env():
     """Load environment variables from .env file with detailed logging."""
-    env_path = Path('/app/.env')
-    if not env_path.exists():
-        raise FileNotFoundError(f"File not found: {env_path}")
-        
-    # Загружаем переменные окружения из файла .env
-    load_dotenv(env_path)
+    if not ENV_PATH.exists():
+        raise FileNotFoundError(f"File not found: {ENV_PATH}")
+    
+    # Загружаем переменные окружения из файла .env с явным указанием пути
+    load_dotenv(dotenv_path=ENV_PATH, override=True)
     
     # Проверяем загрузку BOT_TOKEN
     bot_token = os.getenv('BOT_TOKEN')
     if not bot_token:
-        with open(env_path) as f:
-            print(f"DEBUG: .env contents: {f.read()}")
+        with open(ENV_PATH) as f:
+            content = f.read()
+            print(f"DEBUG: Content length: {len(content)}")
+            print(f"DEBUG: BOT_TOKEN line: {[line for line in content.splitlines() if 'BOT_TOKEN' in line]}")
         raise ValueError("BOT_TOKEN not found in environment variables")
 
 # Загружаем конфигурацию
