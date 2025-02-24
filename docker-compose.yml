@@ -11,20 +11,23 @@ services:
     stop_grace_period: 30s
     stop_signal: SIGTERM
     volumes:
-      - ./.env:/app/.env:ro
+      - type: bind
+        source: ${PWD}/.env
+        target: /app/.env
+        read_only: true
       - ./logs:/app/logs
     environment:
       - PYTHONUNBUFFERED=1
       - TZ=UTC
       - CREATED_BY=gopnikgame
-      - CREATED_AT=2025-02-24_11:43
+      - CREATED_AT=2025-02-24_12:12:50
     logging:
       driver: "json-file"
       options:
         max-size: "10m"
         max-file: "3"
     healthcheck:
-      test: ["CMD", "python", "-c", "import os; exit(0 if os.path.exists('/app/logs/bot.log') else 1)"]
+      test: ["CMD", "sh", "-c", "test -s /app/.env && grep -q '^BOT_TOKEN=' /app/.env"]
       interval: 30s
       timeout: 10s
       retries: 3
