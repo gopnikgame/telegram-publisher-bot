@@ -5,7 +5,6 @@ from datetime import datetime
 from typing import List, Tuple, Optional
 from logging.handlers import RotatingFileHandler
 
-# Пользовательские исключения
 class MessageFormattingError(Exception):
     """Ошибка форматирования сообщения"""
     pass
@@ -53,12 +52,6 @@ def setup_logging():
 def escape_markdown(text: str) -> str:
     """
     Экранирование специальных символов для Markdown.
-    
-    Args:
-        text (str): Исходный текст
-        
-    Returns:
-        str: Текст с экранированными символами
     """
     escape_chars = ['_', '*', '[', ']', '(', ')', '~', '`', '>', '#', '+', '-', '=', '|', '{', '}', '.', '!']
     return ''.join('\\' + char if char in escape_chars else char for char in text)
@@ -66,12 +59,6 @@ def escape_markdown(text: str) -> str:
 def extract_urls(text: str) -> List[str]:
     """
     Извлекает URL из текста.
-    
-    Args:
-        text (str): Исходный текст
-        
-    Returns:
-        List[str]: Список найденных URL
     """
     url_pattern = r'http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\\(\\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+'
     return re.findall(url_pattern, text)
@@ -79,13 +66,6 @@ def extract_urls(text: str) -> List[str]:
 def format_links_inline(urls: List[str], format_type: str = 'markdown') -> str:
     """
     Форматирование ссылок с поддержкой разных форматов.
-    
-    Args:
-        urls (List[str]): Список URL для форматирования
-        format_type (str): Тип форматирования ('markdown', 'html', 'plain', 'modern')
-        
-    Returns:
-        str: Отформатированные ссылки
     """
     if not urls:
         return ''
@@ -105,16 +85,6 @@ def format_links_inline(urls: List[str], format_type: str = 'markdown') -> str:
 def format_message(text: str, format_type: str = 'markdown') -> str:
     """
     Форматирование сообщения перед отправкой.
-    
-    Args:
-        text (str): Исходный текст
-        format_type (str): Тип форматирования ('markdown', 'html', 'plain', 'modern')
-        
-    Returns:
-        str: Отформатированный текст
-        
-    Raises:
-        MessageFormattingError: При ошибке форматирования
     """
     try:
         if text is None:
@@ -124,43 +94,31 @@ def format_message(text: str, format_type: str = 'markdown') -> str:
         urls = extract_urls(text)
         
         if format_type == 'plain':
-            # Для обычного текста просто очищаем лишние пробелы
             text = re.sub(r'\s+', ' ', text)
             if urls:
                 text += '\n\n' + format_links_inline(urls, 'plain')
             return text.strip()
             
         if format_type == 'html':
-            # Экранирование HTML
             text = text.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
-            # Форматирование ссылок для HTML
             for url in urls:
                 text = text.replace(url, '')
-            # Добавляем ссылки в конце
             if urls:
                 text += format_links_inline(urls, 'html')
             return text.strip()
             
         # Markdown и Modern форматирование
-        # Сначала удаляем URL из текста
         for url in urls:
             text = text.replace(url, '')
         
         if format_type == 'modern':
-            # Сохраняем modern-форматирование (**жирный**)
             text = re.sub(r'\*\*(.*?)\*\*', r'*\1*', text)
         
-        # Экранируем markdown
         text = escape_markdown(text)
-        
-        # Форматируем списки
         text = re.sub(r'(\d+\.)(?=\S)', r'\1 ', text)
-        
-        # Исправляем переносы строк
         text = re.sub(r'\n{3,}', '\n\n', text)
         text = re.sub(r'\n\s+', '\n', text)
         
-        # Добавляем ссылки в конце
         if urls:
             text += format_links_inline(urls, format_type)
         
@@ -174,19 +132,9 @@ def format_message(text: str, format_type: str = 'markdown') -> str:
 def check_file_size(size: int, max_size: Optional[int] = None) -> bool:
     """
     Проверка размера файла.
-    
-    Args:
-        size (int): Размер файла в байтах
-        max_size (Optional[int]): Максимальный размер (если не указан, берется из Config)
-        
-    Returns:
-        bool: True если размер допустимый, False иначе
-        
-    Raises:
-        FileSizeError: При превышении допустимого размера
     """
-    from app.config import Config
-    limit = max_size or Config.MAX_FILE_SIZE
+    from app.config import config
+    limit = max_size or config.MAX_FILE_SIZE
     if size > limit:
         raise FileSizeError(f"Размер файла ({size} байт) превышает допустимый предел ({limit} байт)")
     return True
@@ -194,38 +142,32 @@ def check_file_size(size: int, max_size: Optional[int] = None) -> bool:
 def format_bot_links(format_type: str = 'markdown') -> str:
     """
     Форматирование ссылок для ботов и каналов.
-    
-    Args:
-        format_type (str): Тип форматирования ('markdown', 'html', 'plain', 'modern')
-        
-    Returns:
-        str: Отформатированные ссылки
     """
-    from app.config import Config
+    from app.config import config
     
     links = []
-    if Config.MAIN_BOT_LINK and Config.MAIN_BOT_NAME:
+    if config.MAIN_BOT_LINK and config.MAIN_BOT_NAME:
         if format_type == 'html':
-            links.append(f'<a href="{Config.MAIN_BOT_LINK}">{Config.MAIN_BOT_NAME}</a>')
+            links.append(f'<a href="{config.MAIN_BOT_LINK}">{config.MAIN_BOT_NAME}</a>')
         elif format_type == 'plain':
-            links.append(f'{Config.MAIN_BOT_NAME}: {Config.MAIN_BOT_LINK}')
+            links.append(f'{config.MAIN_BOT_NAME}: {config.MAIN_BOT_LINK}')
         else:
-            links.append(f"[{escape_markdown(Config.MAIN_BOT_NAME)}]({escape_markdown(Config.MAIN_BOT_LINK)})")
+            links.append(f"[{escape_markdown(config.MAIN_BOT_NAME)}]({escape_markdown(config.MAIN_BOT_LINK)})")
             
-    if Config.SUPPORT_BOT_LINK and Config.SUPPORT_BOT_NAME:
+    if config.SUPPORT_BOT_LINK and config.SUPPORT_BOT_NAME:
         if format_type == 'html':
-            links.append(f'<a href="{Config.SUPPORT_BOT_LINK}">{Config.SUPPORT_BOT_NAME}</a>')
+            links.append(f'<a href="{config.SUPPORT_BOT_LINK}">{config.SUPPORT_BOT_NAME}</a>')
         elif format_type == 'plain':
-            links.append(f'{Config.SUPPORT_BOT_NAME}: {Config.SUPPORT_BOT_LINK}')
+            links.append(f'{config.SUPPORT_BOT_NAME}: {config.SUPPORT_BOT_LINK}')
         else:
-            links.append(f"[{escape_markdown(Config.SUPPORT_BOT_NAME)}]({escape_markdown(Config.SUPPORT_BOT_LINK)})")
+            links.append(f"[{escape_markdown(config.SUPPORT_BOT_NAME)}]({escape_markdown(config.SUPPORT_BOT_LINK)})")
             
-    if Config.CHANNEL_LINK and Config.CHANNEL_NAME:
+    if config.CHANNEL_LINK and config.CHANNEL_NAME:
         if format_type == 'html':
-            links.append(f'<a href="{Config.CHANNEL_LINK}">{Config.CHANNEL_NAME}</a>')
+            links.append(f'<a href="{config.CHANNEL_LINK}">{config.CHANNEL_NAME}</a>')
         elif format_type == 'plain':
-            links.append(f'{Config.CHANNEL_NAME}: {Config.CHANNEL_LINK}')
+            links.append(f'{config.CHANNEL_NAME}: {config.CHANNEL_LINK}')
         else:
-            links.append(f"[{escape_markdown(Config.CHANNEL_NAME)}]({escape_markdown(Config.CHANNEL_LINK)})")
+            links.append(f"[{escape_markdown(config.CHANNEL_NAME)}]({escape_markdown(config.CHANNEL_LINK)})")
     
     return ' | '.join(links) if links else "Не настроены"
