@@ -16,22 +16,23 @@ lib64/
 parts/
 sdist/
 var/
+wheels/
 *.egg-info/
 .installed.cfg
 *.egg
 
-# Logs
+# Логи и конфиги
 logs/
 *.log
-
-# Environment
 .env
-.venv
-venv/
-ENV/
 
 # IDE
 .idea/
 .vscode/
 *.swp
 *.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
