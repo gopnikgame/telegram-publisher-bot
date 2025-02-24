@@ -254,19 +254,19 @@ manage_container() {
     case $action in
         "restart")
             log "BLUE" "🔄 Перезапуск контейнера..."
-            docker_compose_cmd down --remove-orphans || force_remove_container
-            docker_compose_cmd up -d
+            docker_compose_cmd -f docker/docker-compose.yml down --remove-orphans || force_remove_container
+            docker_compose_cmd -f docker/docker-compose.yml up -d
             ;;
         "stop")
             log "BLUE" "⏹️ Остановка контейнера..."
-            docker_compose_cmd down --remove-orphans || force_remove_container
+            docker_compose_cmd -f docker/docker-compose.yml down --remove-orphans || force_remove_container
             ;;
         "start")
             log "BLUE" "▶️ Запуск контейнера..."
             if docker ps -a | grep -q "telegram-publisher-bot"; then
                 force_remove_container
             fi
-            docker_compose_cmd up -d
+            docker_compose_cmd -f docker/docker-compose.yml up -d
             ;;
     esac
 
@@ -276,12 +276,12 @@ manage_container() {
 
         if ! docker ps | grep -q "telegram-publisher-bot"; then
             log "RED" "❌ Ошибка запуска контейнера"
-            docker_compose_cmd logs
+            docker_compose_cmd -f docker/docker-compose.yml logs
             return 1
         fi
 
         log "GREEN" "✅ Контейнер запущен"
-        docker_compose_cmd logs --tail=10
+        docker_compose_cmd -f docker/docker-compose.yml logs --tail=10
     fi
 }
 
