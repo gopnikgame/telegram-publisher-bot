@@ -7,6 +7,7 @@ RUN groupadd -r botuser && useradd -r -g botuser botuser
 RUN apt-get update && apt-get install -y \
     gcc \
     python3-dev \
+    linux-headers-amd64 \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
