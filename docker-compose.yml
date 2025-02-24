@@ -20,3 +20,4 @@ services:
       interval: 1m
       timeout: 10s
       retries: 3
+    user: "${UID:-1000}:${GID:-1000}"  # Используем UID и GID текущего пользователя
