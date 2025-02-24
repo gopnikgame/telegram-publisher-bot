@@ -1,52 +1,34 @@
-from telegram import Update, ParseMode, ChatAction
-from telegram.ext import (
-    Updater, CommandHandler, MessageHandler, 
-    Filters, CallbackContext
-)
-from telegram.error import TelegramError
 import logging
+from datetime import datetime
 from functools import wraps
-from typing import Callable, Optional
-import datetime
-import os
+from typing import Callable, Any
+
+from telegram import Update, ParseMode
+from telegram.ext import CallbackContext, CommandHandler, MessageHandler, Filters
 
 from app.config import config
-from app.utils import (
-    setup_logging, format_message, check_file_size,
-    MessageFormattingError, FileSizeError, format_bot_links
-)
+from app.utils import format_message, check_file_size
 
-# Настройка логирования
-logger = setup_logging()
+logger = logging.getLogger(__name__)
 
-# Время запуска бота
-START_TIME = datetime.datetime.now()
-
-def send_typing_action(func: Callable) -> Callable:
-    """Декоратор для отображения 'печатает...' во время обработки сообщения."""
-    @wraps(func)
-    def command_func(update: Update, context: CallbackContext, *args, **kwargs):
-        context.bot.send_chat_action(
-            chat_id=update.effective_message.chat_id, 
-            action=ChatAction.TYPING
-        )
-        return func(update, context, *args, **kwargs)
-    return command_func
+# Глобальная переменная для хранения времени запуска
+START_TIME = datetime.now()
 
 def check_admin(func: Callable) -> Callable:
     """Декоратор для проверки прав администратора."""
     @wraps(func)
-    def wrapper(update: Update, context: CallbackContext, *args, **kwargs):
+    def wrapped(update: Update, context: CallbackContext, *args: Any, **kwargs: Any) -> Any:
         user_id = str(update.effective_user.id)
         if user_id not in config.ADMIN_IDS:
-            update.message.reply_text('У вас нет прав для использования этой команды.')
+            logger.warning(f"Попытка доступа к админ-команде от пользователя {user_id}")
+            update.message.reply_text("⛔ У вас нет прав для выполнения этой команды")
             return
         return func(update, context, *args, **kwargs)
-    return wrapper
+    return wrapped
 
 def error_handler(update: Update, context: CallbackContext) -> None:
     """Глобальный обработчик ошибок."""
-    logger.error(f"Update {update} вызвал ошибку {context.error}")
+    logger.error(f"Update {update} вызвал ошибку {context.error}", exc_info=context.error)
     
     try:
         if update and update.effective_message:
@@ -57,51 +39,64 @@ def error_handler(update: Update, context: CallbackContext) -> None:
     except:
         pass
 
-@check_admin
 def start(update: Update, context: CallbackContext) -> None:
     """Обработчик команды /start."""
+    user = update.effective_user
+    logger.info(f"Пользователь {user.id} запустил бота")
+    
     message = (
-        f"👋 Привет! Я бот для публикации сообщений в канале.\n\n"
-        f"📝 Текущий формат сообщений: {config.DEFAULT_FORMAT}\n"
-        f"🔄 Тестовый режим: {'включен' if config.TEST_MODE else 'выключен'}\n\n"
-        f"ℹ️ Доступные команды:\n"
-        f"/help - показать справку\n"
-        f"/test - включить/выключить тестовый режим\n"
-        f"/format - изменить формат сообщений\n"
-        f"/stats - показать статистику\n"
-        f"/links - показать настроенные ссылки"
+        f"👋 Привет, {user.first_name}!\n\n"
+        "🤖 Я бот для публикации сообщений в канале.\n"
+        "📝 Отправьте мне текст или файл для публикации.\n\n"
+        "Доступные команды:\n"
+        "/help - показать справку\n"
     )
+    
+    if str(user.id) in config.ADMIN_IDS:
+        message += (
+            "\nКоманды администратора:\n"
+            "/test - включить/выключить тестовый режим\n"
+            "/format - изменить формат сообщений\n"
+            "/stats - показать статистику\n"
+            "/links - показать настроенные ссылки"
+        )
+    
     update.message.reply_text(message)
 
-@check_admin
 def help_command(update: Update, context: CallbackContext) -> None:
     """Обработчик команды /help."""
     message = (
-        "📚 Справка по использованию бота:\n\n"
+        "📖 Справка по использованию бота:\n\n"
         "1️⃣ Отправьте текст или файл для публикации\n"
-        "2️⃣ Используйте команды для управления:\n"
-        "/test - включить/выключить тестовый режим\n"
-        "/format - изменить формат сообщений\n"
-        "/stats - показать статистику\n"
-        "/links - показать настроенные ссылки\n\n"
-        f"ℹ️ Текущие настройки:\n"
-        f"📝 Формат: {config.DEFAULT_FORMAT}\n"
-        f"🔄 Тестовый режим: {'включен' if config.TEST_MODE else 'выключен'}\n\n"
-        "💡 Поддерживаемые форматы:\n"
-        "- **жирный текст**\n"
-        "- Списки (1. пункт)\n"
-        "- Эмодзи 👍\n"
-        "- Ссылки https://example.com"
+        "2️⃣ Поддерживаемые форматы файлов:\n"
+        "   • Документы\n"
+        "   • Изображения\n"
+        "   • Видео\n"
+        "   • Аудио\n\n"
+        "3️⃣ Форматирование текста:\n"
+        "   • **жирный текст**\n"
+        "   • Ссылки добавляются автоматически\n\n"
+        "4️⃣ Команды:\n"
+        "/start - перезапустить бота\n"
+        "/help - показать эту справку\n"
     )
+    
+    if str(update.effective_user.id) in config.ADMIN_IDS:
+        message += (
+            "\n👑 Команды администратора:\n"
+            "/test - тестовый режим (сообщения в тестовый чат)\n"
+            "/format - изменить формат (markdown/html/plain)\n"
+            "/stats - статистика использования\n"
+            "/links - настроенные ссылки"
+        )
+    
     update.message.reply_text(message)
 
 @check_admin
 def test_mode(update: Update, context: CallbackContext) -> None:
-    """Обработчик команды /test."""
+    """Включение/выключение тестового режима."""
     try:
-        # Переключаем режим
         new_mode = not config.TEST_MODE
-        # Обновляем значение в конфиге
         config.TEST_MODE = new_mode
         
         message = (
@@ -109,7 +104,6 @@ def test_mode(update: Update, context: CallbackContext) -> None:
             f"{'⚠️ Сообщения будут отправляться в тестовый чат' if new_mode else '✅ Сообщения будут отправляться в канал'}"
         )
         update.message.reply_text(message)
-        
         logger.info(f"Тестовый режим {'включен' if new_mode else 'выключен'}")
     except Exception as e:
         logger.error(f"Ошибка при переключении тестового режима: {e}")
@@ -118,170 +112,132 @@ def test_mode(update: Update, context: CallbackContext) -> None:
 @check_admin
 def format_command(update: Update, context: CallbackContext) -> None:
     """Обработчик команды /format."""
-    available_formats = ['markdown', 'html', 'plain', 'modern']
+    args = context.args
     
-    if not context.args:
+    if not args:
         current_format = config.DEFAULT_FORMAT
         message = (
-            f"📝 Текущий формат: {current_format}\n\n"
-            f"Доступные форматы:\n"
-            f"- markdown (стандартный)\n"
-            f"- html (HTML-разметка)\n"
-            f"- plain (без форматирования)\n"
-            f"- modern (улучшенный markdown)\n\n"
-            f"Для изменения отправьте:\n"
-            f"/format название_формата"
+            "📝 Доступные форматы:\n"
+            "• markdown - стандартный markdown\n"
+            "• html - HTML-разметка\n"
+            "• plain - без форматирования\n"
+            "• modern - улучшенный markdown (v2)\n\n"
+            f"Текущий формат: {current_format}\n\n"
+            "Для смены формата используйте:\n"
+            "/format название_формата"
         )
         update.message.reply_text(message)
         return
     
-    new_format = context.args[0].lower()
-    if new_format not in available_formats:
-        update.message.reply_text(
-            f"❌ Неверный формат. Доступные форматы:\n"
-            f"{', '.join(available_formats)}"
-        )
+    new_format = args[0].lower()
+    if new_format not in ['markdown', 'html', 'plain', 'modern']:
+        update.message.reply_text("❌ Неверный формат. Используйте: markdown, html, plain или modern")
         return
     
-    try:
-        # Обновляем значение в конфиге
-        config.DEFAULT_FORMAT = new_format
-        update.message.reply_text(f"✅ Формат сообщений изменен на: {new_format}")
-        logger.info(f"Формат сообщений изменен на: {new_format}")
-    except Exception as e:
-        logger.error(f"Ошибка при изменении формата: {e}")
-        update.message.reply_text("❌ Ошибка при изменении формата")
+    config.DEFAULT_FORMAT = new_format
+    update.message.reply_text(f"✅ Формат сообщений изменен на: {new_format}")
+    logger.info(f"Формат сообщений изменен на: {new_format}")
 
 @check_admin
 def stats(update: Update, context: CallbackContext) -> None:
-    """Показывает статистику работы бота."""
-    uptime = datetime.datetime.now() - START_TIME
-    hours, remainder = divmod(int(uptime.total_seconds()), 3600)
+    """Показывает статистику бота."""
+    uptime = datetime.now() - START_TIME
+    hours, remainder = divmod(uptime.seconds, 3600)
     minutes, seconds = divmod(remainder, 60)
     
-    uptime_str = f"{hours}ч {minutes}м {seconds}с"
-    
     stats_message = (
-        f"📊 Статистика бота:\n\n"
-        f"⏱️ Время работы: {uptime_str}\n"
+        "📊 Статистика бота:\n\n"
+        f"⏱ Время работы: {uptime.days}д {hours}ч {minutes}м {seconds}с\n"
+        f"📝 Формат: {config.DEFAULT_FORMAT}\n"
         f"🔄 Тестовый режим: {'включен' if config.TEST_MODE else 'выключен'}\n"
-        f"📝 Формат сообщений: {config.DEFAULT_FORMAT}\n"
-        f"📨 Максимальный размер файла: {config.MAX_FILE_SIZE / 1024 / 1024:.1f} MB"
+        f"👥 Администраторов: {len(config.ADMIN_IDS)}"
     )
+    
     update.message.reply_text(stats_message)
 
 @check_admin
 def links(update: Update, context: CallbackContext) -> None:
     """Показывает настроенные ссылки."""
-    links_info = format_bot_links(config.DEFAULT_FORMAT)
-    message = f"🔗 Настроенные ссылки:\n\n{links_info}"
-    update.message.reply_text(message, parse_mode=ParseMode.MARKDOWN)
+    message = "🔗 Настроенные ссылки:\n\n"
+    
+    if config.MAIN_BOT_LINK:
+        message += f"🤖 Основной бот: {config.MAIN_BOT_LINK}\n"
+    
+    if config.SUPPORT_BOT_LINK:
+        message += f"💬 Техподдержка: {config.SUPPORT_BOT_LINK}\n"
+    
+    if config.CHANNEL_LINK:
+        message += f"📢 Канал: {config.CHANNEL_LINK}\n"
+    
+    if message == "🔗 Настроенные ссылки:\n\n":
+        message = "❌ Нет настроенных ссылок"
+    
+    update.message.reply_text(message)
 
-@check_admin
-@send_typing_action
 def handle_message(update: Update, context: CallbackContext) -> None:
     """Обработчик входящих сообщений."""
     try:
-        message = update.message
-        
-        # Определяем режим парсинга на основе формата
-        parse_mode = {
-            'markdown': ParseMode.MARKDOWN,
-            'html': ParseMode.HTML,
-            'modern': ParseMode.MARKDOWN_V2,
-            'plain': None
-        }.get(config.DEFAULT_FORMAT.lower())
-        
         # Определяем целевой чат
-        target_chat_id = (config.TEST_CHAT_ID or str(update.effective_user.id)) if config.TEST_MODE else config.CHANNEL_ID
-        test_prefix = "[ТЕСТ] " if config.TEST_MODE else ""
+        target_chat = config.TEST_CHAT_ID if config.TEST_MODE else config.CHANNEL_ID
+        if not target_chat:
+            update.message.reply_text("❌ Не настроен ID канала/чата")
+            return
         
-        if message.document:
-            # Проверка размера файла
-            check_file_size(message.document.file_size)
+        # Обрабатываем документ
+        if update.message.document:
+            doc = update.message.document
+            try:
+                check_file_size(doc.file_size)
+            except Exception as e:
+                update.message.reply_text(str(e))
+                return
             
-            # Получаем описание файла
-            caption = message.caption or ''
-            formatted_caption = format_message(f"{test_prefix}{caption}", config.DEFAULT_FORMAT)
-            
-            # Отправляем файл
-            sent_message = context.bot.send_document(
-                chat_id=target_chat_id,
-                document=message.document.file_id,
-                caption=formatted_caption,
-                parse_mode=parse_mode
+            # Отправляем документ
+            context.bot.send_document(
+                chat_id=target_chat,
+                document=doc.file_id,
+                caption=update.message.caption if update.message.caption else None,
+                parse_mode=ParseMode.MARKDOWN if config.DEFAULT_FORMAT == 'markdown' else None
             )
-        else:
-            # Форматируем и отправляем текстовое сообщение
-            formatted_text = format_message(f"{test_prefix}{message.text}", config.DEFAULT_FORMAT)
-            sent_message = context.bot.send_message(
-                chat_id=target_chat_id,
+        
+        # Обрабатываем текстовое сообщение
+        elif update.message.text:
+            formatted_text = format_message(update.message.text, config.DEFAULT_FORMAT)
+            
+            # Отправляем сообщение
+            context.bot.send_message(
+                chat_id=target_chat,
                 text=formatted_text,
-                parse_mode=parse_mode
+                parse_mode=ParseMode.MARKDOWN if config.DEFAULT_FORMAT == 'markdown' else None,
+                disable_web_page_preview=True
             )
         
-        # Логируем успешную отправку
-        logger.info(
-            f"Сообщение отправлено в чат {target_chat_id} "
-            f"(тестовый режим: {config.TEST_MODE})"
-        )
+        update.message.reply_text("✅ Сообщение успешно отправлено")
+        logger.info(f"Сообщение отправлено в чат {target_chat}")
         
-        update.message.reply_text("✅ Сообщение отправлено")
-        
-    except FileSizeError as e:
-        update.message.reply_text(f"❌ {str(e)}")
-        logger.warning(f"Ошибка размера файла: {e}")
-    except MessageFormattingError as e:
-        update.message.reply_text(f"❌ {str(e)}")
-        logger.error(f"Ошибка форматирования: {e}")
-    except TelegramError as e:
-        error_message = f"❌ Ошибка Telegram: {str(e)}"
-        logger.error(error_message)
-        update.message.reply_text(error_message)
     except Exception as e:
-        error_message = f"❌ Неизвестная ошибка: {str(e)}"
-        logger.error(error_message)
-        update.message.reply_text(error_message)
+        logger.error(f"Ошибка при обработке сообщения: {e}")
+        update.message.reply_text(f"❌ Ошибка при отправке сообщения: {str(e)}")
 
-def main() -> None:
-    """Основная функция запуска бота."""
-    try:
-        updater = Updater(config.BOT_TOKEN)
-        dispatcher = updater.dispatcher
-        
-        # Регистрация обработчиков команд
-        dispatcher.add_handler(CommandHandler("start", start))
-        dispatcher.add_handler(CommandHandler("help", help_command))
-        dispatcher.add_handler(CommandHandler("test", test_mode))
-        dispatcher.add_handler(CommandHandler("format", format_command))
-        dispatcher.add_handler(CommandHandler("stats", stats))
-        dispatcher.add_handler(CommandHandler("links", links))
-        
-        # Регистрация обработчика сообщений
-        dispatcher.add_handler(MessageHandler(
-            Filters.text | Filters.document, 
-            handle_message
-        ))
-        
-        # Регистрация обработчика ошибок
-        dispatcher.add_error_handler(error_handler)
-        
-        # Запуск бота
-        if config.HTTPS_PROXY:
-            updater.start_polling(
-                bootstrap_retries=-1,
-                read_timeout=30,
-                connect_timeout=15,
-                request_kwargs={
-                    'proxy_url': config.HTTPS_PROXY
-                }
-            )
-        else:
-            updater.start_polling()
-        
-        logger.info('Бот успешно запущен')
-        updater.idle()
-        
-    except Exception as e:
-        logger.critical(f"Критическая ошибка при запуске бота: {e}")
-        raise
+def setup_bot(dispatcher):
+    """Настройка обработчиков команд бота."""
+    logger.info("=== Бот инициализируется ===")
+    
+    # Регистрируем обработчики команд
+    dispatcher.add_handler(CommandHandler("start", start))
+    dispatcher.add_handler(CommandHandler("help", help_command))
+    dispatcher.add_handler(CommandHandler("test", test_mode))
+    dispatcher.add_handler(CommandHandler("format", format_command))
+    dispatcher.add_handler(CommandHandler("stats", stats))
+    dispatcher.add_handler(CommandHandler("links", links))
+    
+    # Регистрируем обработчик сообщений
+    dispatcher.add_handler(MessageHandler(
+        Filters.text | Filters.document, 
+        handle_message
+    ))
+    
+    # Регистрируем обработчик ошибок
+    dispatcher.add_error_handler(error_handler)
+    
+    logger.info("=== Обработчики команд зарегистрированы ===")
