@@ -1,8 +1,9 @@
 #!/bin/bash
 
 # Текущая дата и время в UTC для меток
-CREATED_AT="2025-02-24 13:35:56"
+CREATED_AT="2025-02-24 18:04:30"
 CREATED_BY="gopnikgame"
+REPO_URL="https://github.com/gopnikgame/telegram-publisher-bot.git"
 
 # Цвета для вывода
 RED='\033[0;31m'
@@ -29,6 +30,93 @@ check_docker() {
         return 1
     fi
     return 0
+}
+
+# Функция для работы с git
+setup_repository() {
+    log "BLUE" "🔍 Проверка репозитория..."
+    
+    # Проверяем, есть ли .git директория
+    if [ ! -d ".git" ]; then
+        log "BLUE" "📥 Клонирование репозитория..."
+        git clone "$REPO_URL" . || {
+            log "RED" "❌ Ошибка клонирования репозитория"
+            return 1
+        }
+        log "GREEN" "✅ Репозиторий успешно клонирован"
+    else
+        # Если это git репозиторий, проверяем remote
+        local current_remote
+        current_remote=$(git remote get-url origin 2>/dev/null)
+        
+        if [ "$current_remote" != "$REPO_URL" ]; then
+            log "YELLOW" "⚠️ Неверный репозиторий"
+            log "BLUE" "🔄 Настройка правильного репозитория..."
+            git remote set-url origin "$REPO_URL" || {
+                log "RED" "❌ Ошибка настройки репозитория"
+                return 1
+            }
+        fi
+    fi
+    
+    # Получаем последние изменения
+    log "BLUE" "🔄 Обновление репозитория..."
+    git fetch origin || {
+        log "RED" "❌ Ошибка получения обновлений"
+        return 1
+    }
+    
+    # Проверяем наличие изменений
+    local local_head
+    local remote_head
+    local_head=$(git rev-parse HEAD)
+    remote_head=$(git rev-parse origin/main)
+    
+    if [ "$local_head" != "$remote_head" ]; then
+        log "BLUE" "📥 Применение обновлений..."
+        git pull origin main || {
+            log "RED" "❌ Ошибка обновления репозитория"
+            return 1
+        }
+        log "GREEN" "✅ Репозиторий успешно обновлен"
+        return 2  # Код 2 означает, что были обновления
+    fi
+    
+    log "GREEN" "✅ Репозиторий в актуальном состоянии"
+    return 0
+}
+
+# Функция для проверки и создания файлов
+check_and_create_files() {
+    log "BLUE" "🔍 Проверка файлов проекта..."
+    
+    # Проверяем/создаем директорию для логов
+    if [ ! -d logs ]; then
+        log "BLUE" "📁 Создание директории для логов..."
+        mkdir -p logs
+        log "GREEN" "✅ Директория logs создана"
+    fi
+    
+    # Проверяем наличие основных файлов
+    local required_files=("docker-compose.yml" "Dockerfile" "requirements.txt")
+    local missing_files=false
+    
+    for file in "${required_files[@]}"; do
+        if [ ! -f "$file" ]; then
+            missing_files=true
+            log "YELLOW" "⚠️ Отсутствует файл: $file"
+        fi
+    done
+    
+    if [ "$missing_files" = true ]; then
+        log "BLUE" "🔄 Обновление файлов из репозитория..."
+        setup_repository || {
+            log "RED" "❌ Ошибка получения файлов из репозитория"
+            exit 1
+        }
+    fi
+    
+    log "GREEN" "✅ Все необходимые файлы проверены"
 }
 
 # Функция для обновления конфигурации
@@ -104,8 +192,6 @@ EOL
         esac
     done
     
-    log "BLUE" "✅ Конфигурация .env завершена"
-    
     # Устанавливаем права доступа
     log "BLUE" "🔧 Настройка прав доступа..."
     chmod 600 .env
@@ -131,29 +217,16 @@ manage_container() {
             ;;
         "start")
             # Проверка конфигурации
-            log "BLUE" "🔍 Проверка конфигурации .env..."
             if [ ! -f .env ]; then
                 log "RED" "❌ Файл .env не найден"
                 return 1
             fi
 
-            # Выводим текущие настройки
-            log "BLUE" "📝 Текущие настройки:"
-            while IFS='=' read -r key value; do
-                if [[ $key == "BOT_TOKEN" ]]; then
-                    if [ -n "$value" ]; then
-                        log "GREEN" "✓ BOT_TOKEN: установлен (длина: ${#value} символов)"
-                    else
-                        log "RED" "✗ BOT_TOKEN: не установлен"
-                        return 1
-                    fi
-                else
-                    log "BLUE" "$key: $value"
-                fi
-            done < .env
-
-            # Проверка монтирования .env
-            log "BLUE" "🔍 Проверка монтирования .env..."
+            # Проверяем BOT_TOKEN
+            if ! grep -q "^BOT_TOKEN=..*" .env; then
+                log "RED" "❌ BOT_TOKEN не установлен в .env"
+                return 1
+            fi
 
             # Запуск контейнера
             log "BLUE" "▶️ Запуск контейнера..."
@@ -239,9 +312,11 @@ main_menu() {
                 update_config
                 ;;
             2)
+                check_and_create_files
                 manage_container "start"
                 ;;
             3)
+                check_and_create_files
                 manage_container "restart"
                 ;;
             4)
@@ -252,9 +327,21 @@ main_menu() {
                 ;;
             6)
                 log "BLUE" "🔄 Обновление бота..."
-                git pull
-                docker-compose build --no-cache
-                manage_container "restart"
+                setup_repository
+                update_status=$?
+                
+                if [ $update_status -eq 1 ]; then
+                    log "RED" "❌ Ошибка обновления"
+                    continue
+                fi
+                
+                if [ $update_status -eq 2 ]; then
+                    log "BLUE" "🏗️ Пересборка контейнера..."
+                    docker-compose build --no-cache
+                    manage_container "restart"
+                else
+                    log "GREEN" "✅ Обновление не требуется"
+                fi
                 ;;
             7)
                 log "GREEN" "👋 До свидания!"
