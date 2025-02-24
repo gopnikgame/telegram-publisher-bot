@@ -13,19 +13,24 @@ RUN groupadd -g $DOCKER_GID appuser && \
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Создаем директорию для логов
+# Создаем директорию для логов и настраиваем права
 RUN mkdir -p /app/logs && \
-    chown -R appuser:appuser /app
+    chown -R appuser:appuser /app && \
+    chmod -R 755 /app && \
+    chmod -R 777 /app/logs  # Даем полные права на директорию logs
 
 # Копируем код приложения (без .env)
 COPY --chown=appuser:appuser app app/
 COPY --chown=appuser:appuser requirements.txt .
 
-# Переключаемся на пользователя appuser
-USER appuser
-
 # Добавляем скрипт для проверки и запуска
 COPY --chown=appuser:appuser docker-entrypoint.sh /app/
 RUN chmod +x /app/docker-entrypoint.sh
+
+# Переключаемся на пользователя appuser
+USER appuser
+
+# Проверяем рабочую директорию и права
+RUN pwd && ls -la && ls -la /app/logs
 
 ENTRYPOINT ["/app/docker-entrypoint.sh"]
