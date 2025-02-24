@@ -1,6 +1,7 @@
 telegram-publisher-bot/
 ├── app/
 │   ├── __init__.py
+│   ├── __main__.py
 │   ├── bot.py
 │   ├── config.py
 │   └── utils.py
