@@ -301,7 +301,7 @@ manage_container() {
     # Экспортируем переменные окружения
     export DOCKER_UID DOCKER_GID
     export CREATED_BY="gopnikgame"
-    export CREATED_AT="2025-02-24 11:57:51"
+    export CREATED_AT="2025-02-24 12:02:29"
     
     # Проверка конфигурации перед запуском/перезапуском
     if [ "$action" = "start" ] || [ "$action" = "restart" ]; then
@@ -310,22 +310,50 @@ manage_container() {
             log "YELLOW" "⚠️ Сначала настройте конфигурацию (пункт 1 в меню)"
             return 1
         fi
+
+        # Детальная проверка .env файла
+        log "BLUE" "🔍 Проверка конфигурации .env..."
         
-        if ! grep -q "^BOT_TOKEN=.\\+" "$TARGET_DIR/.env"; then
-            log "RED" "❌ BOT_TOKEN не настроен в .env файле"
-            log "YELLOW" "⚠️ Сначала настройте конфигурацию (пункт 1 в меню)"
+        # Показываем текущие значения (без токена)
+        log "BLUE" "📝 Текущие настройки:"
+        while IFS='=' read -r key value; do
+            if [[ $key == \#* ]] || [[ -z $key ]]; then
+                continue
+            fi
+            if [[ $key == "BOT_TOKEN" ]]; then
+                if [[ -n $value ]]; then
+                    log "GREEN" "✓ BOT_TOKEN: установлен"
+                else
+                    log "RED" "✗ BOT_TOKEN: не установлен"
+                fi
+            else
+                log "BLUE" "$key: $value"
+            fi
+        done < "$TARGET_DIR/.env"
+
+        # Проверяем права доступа
+        if [ $(stat -c %a "$TARGET_DIR/.env") != "600" ]; then
+            log "YELLOW" "⚠️ Исправление прав доступа для .env..."
+            chmod 600 "$TARGET_DIR/.env"
+        fi
+
+        # Проверяем монтирование
+        if ! grep -q "\.env:/app/\.env" docker-compose.yml; then
+            log "RED" "❌ Ошибка конфигурации: .env файл не монтируется корректно"
             return 1
         fi
         
-        if ! grep -q "^ADMIN_IDS=.\\+" "$TARGET_DIR/.env"; then
-            log "RED" "❌ ADMIN_IDS не настроен в .env файле"
-            log "YELLOW" "⚠️ Сначала настройте конфигурацию (пункт 1 в меню)"
-            return 1
-        fi
+        # Проверяем значения в .env
+        local env_errors=0
+        while IFS='=' read -r key value; do
+            if [[ $key == "BOT_TOKEN" ]] && [[ -z "${value// }" ]]; then
+                log "RED" "❌ BOT_TOKEN пустой или содержит только пробелы"
+                env_errors=$((env_errors + 1))
+            fi
+        done < "$TARGET_DIR/.env"
         
-        if ! grep -q "^CHANNEL_ID=.\\+" "$TARGET_DIR/.env"; then
-            log "RED" "❌ CHANNEL_ID не настроен в .env файле"
-            log "YELLOW" "⚠️ Сначала настройте конфигурацию (пункт 1 в меню)"
+        if [ $env_errors -gt 0 ]; then
+            log "RED" "❌ Найдены проблемы в конфигурации"
             return 1
         fi
     fi
@@ -335,6 +363,11 @@ manage_container() {
             log "BLUE" "🔄 Перезапуск контейнера..."
             docker-compose down --remove-orphans --timeout 30 || force_remove_container
             sleep 2
+            # Проверяем конфигурацию Docker
+            docker-compose config --quiet || {
+                log "RED" "❌ Ошибка в конфигурации docker-compose"
+                return 1
+            }
             docker-compose up -d
             ;;
         "stop")
@@ -346,7 +379,19 @@ manage_container() {
             if docker ps -a | grep -q "telegram-publisher-bot"; then
                 force_remove_container
             fi
+            # Проверяем конфигурацию Docker
+            docker-compose config --quiet || {
+                log "RED" "❌ Ошибка в конфигурации docker-compose"
+                return 1
+            }
+            # Проверяем наличие файла внутри контейнера после запуска
             docker-compose up -d
+            sleep 2
+            if ! docker exec telegram-publisher-bot test -f /app/.env; then
+                log "RED" "❌ .env файл не смонтирован в контейнер"
+                docker-compose down
+                return 1
+            fi
             ;;
     esac
     
@@ -354,9 +399,7 @@ manage_container() {
     if [ $exit_code -eq 0 ]; then
         log "GREEN" "✅ Операция успешно выполнена"
         
-        # Если это запуск или перезапуск, проверяем статус
         if [ "$action" = "start" ] || [ "$action" = "restart" ]; then
-            # Ждем немного и проверяем healthcheck
             local max_attempts=6
             local attempt=1
             local container_healthy=false
@@ -380,6 +423,12 @@ manage_container() {
                         ;;
                     "starting")
                         log "YELLOW" "⚠️ Контейнер запускается..."
+                        # Проверяем логи на наличие ошибок
+                        if docker-compose logs --tail=5 | grep -q "BOT_TOKEN не установлен"; then
+                            log "RED" "❌ Ошибка: BOT_TOKEN не читается контейнером"
+                            docker exec telegram-publisher-bot cat /app/.env || log "RED" "❌ Невозможно прочитать .env в контейнере"
+                            return 1
+                        fi
                         ;;
                     "unhealthy")
                         log "RED" "❌ Контейнер в нерабочем состоянии"
