@@ -1,21 +1,21 @@
-from app.config import Config
-import logging
 from telegram import Update, ParseMode, ChatAction
 from telegram.ext import (
     Updater, CommandHandler, MessageHandler, 
     Filters, CallbackContext
 )
 from telegram.error import TelegramError
-import requests
-from app.utils import (
-    setup_logging, format_message, check_file_size,
-    MessageFormattingError, FileSizeError
-)
+import logging
+from functools import wraps
+from typing import Callable, Optional
 import psutil
 import os
 import datetime
-from typing import Optional, Callable
-from functools import wraps
+
+from app.config import config  # Теперь импортируем экземпляр конфигурации
+from app.utils import (
+    setup_logging, format_message, check_file_size,
+    MessageFormattingError, FileSizeError, format_bot_links
+)
 
 # Настройка логирования
 logger = setup_logging()
@@ -36,7 +36,7 @@ def check_admin(func: Callable) -> Callable:
     @wraps(func)
     def wrapper(update: Update, context: CallbackContext, *args, **kwargs):
         user_id = str(update.effective_user.id)
-        if user_id not in Config.ADMIN_IDS:
+        if user_id not in config.ADMIN_IDS:  # Используем config вместо Config
             update.message.reply_text('У вас нет прав для использования этой команды.')
             return
         return func(update, context, *args, **kwargs)
@@ -233,25 +233,21 @@ _Курсив_
 """
     update.message.reply_text(format_text, parse_mode=ParseMode.MARKDOWN)
 
+# В функции handle_message заменяем обращения к Config на config:
 @check_admin
 def handle_message(update: Update, context: CallbackContext) -> None:
-    """Обработчик входящих сообщений."""
     try:
         message = update.message
         
-        # Определяем parse_mode на основе формата
         parse_mode = {
             'markdown': ParseMode.MARKDOWN,
             'html': ParseMode.HTML,
             'modern': ParseMode.MARKDOWN,
             'plain': None
-        }.get(Config.DEFAULT_FORMAT.lower())
+        }.get(config.DEFAULT_FORMAT.lower())  # Используем config
         
-        # Определяем целевой чат
-        target_chat_id = (Config.TEST_CHAT_ID or str(update.effective_user.id)) if Config.TEST_MODE else Config.CHANNEL_ID
-        
-        # Добавляем пометку для тестового режима
-        test_prefix = "[ТЕСТ] " if Config.TEST_MODE else ""
+        target_chat_id = (config.TEST_CHAT_ID or str(update.effective_user.id)) if config.TEST_MODE else config.CHANNEL_ID
+        test_prefix = "[ТЕСТ] " if config.TEST_MODE else ""
 
         sent_message = None
         
@@ -352,11 +348,10 @@ def toggle_test_mode(update: Update, context: CallbackContext) -> None:
         logger.error(f"Ошибка при переключении тестового режима: {e}")
         update.message.reply_text(f"❌ Произошла ошибка: {str(e)}")
 
+# В функции main также используем config:
 def main() -> None:
-    """Основная функция бота."""
     try:
-        # Создаем экземпляр бота
-        updater = Updater(Config.BOT_TOKEN)
+        updater = Updater(config.BOT_TOKEN)  # Используем config
         dispatcher = updater.dispatcher
 
         # Регистрация обработчиков команд
@@ -379,13 +374,13 @@ def main() -> None:
         dispatcher.add_error_handler(error_handler)
 
         # Запуск бота
-        if Config.HTTPS_PROXY:
+        if config.HTTPS_PROXY:  # Используем config
             updater.start_polling(
                 bootstrap_retries=-1,
                 read_timeout=30,
                 connect_timeout=15,
                 request_kwargs={
-                    'proxy_url': Config.HTTPS_PROXY
+                    'proxy_url': config.HTTPS_PROXY
                 }
             )
         else:
