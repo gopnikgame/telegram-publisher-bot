@@ -1,13 +1,11 @@
-import os
+from dataclasses import dataclass, field
 from dotenv import load_dotenv
-import re
-from typing import Tuple, List, Optional
-from dataclasses import dataclass
 import logging
+import os
+import re
+from typing import List, Optional, Tuple
 
-# Загрузка переменных окружения из .env файла
 load_dotenv()
-
 logger = logging.getLogger(__name__)
 
 class ConfigValidationError(Exception):
@@ -15,15 +13,7 @@ class ConfigValidationError(Exception):
     pass
 
 def parse_markdown_link(link_str: Optional[str]) -> Tuple[str, str]:
-    """
-    Парсит markdown-ссылку и возвращает кортеж (название, URL).
-    
-    Args:
-        link_str (Optional[str]): Строка с markdown-ссылкой
-        
-    Returns:
-        Tuple[str, str]: (название, URL)
-    """
+    """Парсит markdown-ссылку и возвращает кортеж (название, URL)."""
     if not link_str:
         return '', ''
     match = re.match(r'\[(.*?)\]\((.*?)\)', link_str)
@@ -32,115 +22,84 @@ def parse_markdown_link(link_str: Optional[str]) -> Tuple[str, str]:
     return '', link_str
 
 def validate_telegram_id(id_str: str) -> bool:
-    """
-    Проверяет корректность Telegram ID.
-    
-    Args:
-        id_str (str): ID для проверки
-        
-    Returns:
-        bool: True если ID корректный
-    """
+    """Проверяет корректность Telegram ID."""
     return bool(re.match(r'^-?\d+$', id_str.strip()))
 
-def validate_config() -> List[str]:
-    """
-    Проверяет корректность конфигурации.
-    
-    Returns:
-        List[str]: Список найденных проблем
-    """
-    problems = []
-    
-    if not Config.BOT_TOKEN:
-        problems.append("BOT_TOKEN не установлен")
-    elif not re.match(r'^\d+:[A-Za-z0-9_-]+$', Config.BOT_TOKEN):
-        problems.append("Некорректный формат BOT_TOKEN")
-    
-    if not Config.ADMIN_IDS:
-        problems.append("ADMIN_IDS не установлен")
-    else:
-        for admin_id in Config.ADMIN_IDS:
-            if not validate_telegram_id(admin_id):
-                problems.append(f"Некорректный ADMIN_ID: {admin_id}")
-    
-    if not Config.CHANNEL_ID:
-        problems.append("CHANNEL_ID не установлен")
-    elif not validate_telegram_id(Config.CHANNEL_ID):
-        problems.append("Некорректный CHANNEL_ID")
-    
-    if Config.TEST_CHAT_ID and not validate_telegram_id(Config.TEST_CHAT_ID):
-        problems.append("Некорректный TEST_CHAT_ID")
-    
-    return problems
+def get_admin_ids() -> List[str]:
+    """Получает список ID администраторов из переменной окружения."""
+    admin_ids = os.getenv('ADMIN_IDS', '').split(',')
+    return [aid.strip() for aid in admin_ids if aid.strip()]
 
 @dataclass
 class Config:
     """Конфигурация бота с валидацией и значениями по умолчанию"""
     
-    # Токен бота
-    BOT_TOKEN: str = os.getenv('BOT_TOKEN', '')
+    BOT_TOKEN: str = field(default_factory=lambda: os.getenv('BOT_TOKEN', ''))
+    ADMIN_IDS: List[str] = field(default_factory=get_admin_ids)
+    CHANNEL_ID: str = field(default_factory=lambda: os.getenv('CHANNEL_ID', ''))
+    MAX_FILE_SIZE: int = field(
+        default_factory=lambda: int(os.getenv('MAX_FILE_SIZE', '20971520'))
+    )
+    DEFAULT_FORMAT: str = field(
+        default_factory=lambda: os.getenv('DEFAULT_FORMAT', 'markdown').lower()
+    )
+    HTTPS_PROXY: Optional[str] = field(
+        default_factory=lambda: os.getenv('HTTPS_PROXY')
+    )
+    TEST_MODE: bool = field(
+        default_factory=lambda: os.getenv('TEST_MODE', 'false').lower() == 'true'
+    )
+    TEST_CHAT_ID: str = field(
+        default_factory=lambda: os.getenv('TEST_CHAT_ID', '')
+    )
     
-    # ID администраторов (список)
-    ADMIN_IDS: List[str] = os.getenv('ADMIN_IDS', '').split(',')
+    MAIN_BOT_NAME: str = field(default='')
+    MAIN_BOT_LINK: str = field(default='')
+    SUPPORT_BOT_NAME: str = field(default='')
+    SUPPORT_BOT_LINK: str = field(default='')
+    CHANNEL_NAME: str = field(default='')
+    CHANNEL_LINK: str = field(default='')
     
-    # ID канала для публикации
-    CHANNEL_ID: str = os.getenv('CHANNEL_ID', '')
-    
-    # Максимальный размер файла (в байтах)
-    MAX_FILE_SIZE: int = int(os.getenv('MAX_FILE_SIZE', 20 * 1024 * 1024))  # 20MB по умолчанию
-    
-    # Формат сообщений по умолчанию
-    DEFAULT_FORMAT: str = os.getenv('DEFAULT_FORMAT', 'markdown').lower()
-    
-    # Прокси
-    HTTPS_PROXY: Optional[str] = os.getenv('HTTPS_PROXY')
-    
-    # Тестовый режим
-    TEST_MODE: bool = os.getenv('TEST_MODE', 'false').lower() == 'true'
-    TEST_CHAT_ID: str = os.getenv('TEST_CHAT_ID', '')
-    
-    # Ссылки
-    MAIN_BOT_NAME: str
-    MAIN_BOT_LINK: str
-    SUPPORT_BOT_NAME: str
-    SUPPORT_BOT_LINK: str
-    CHANNEL_NAME: str
-    CHANNEL_LINK: str
-    
-    @classmethod
-    def load(cls):
-        """
-        Загружает и валидирует конфигурацию.
+    def __post_init__(self):
+        """Валидация после инициализации."""
+        self.MAIN_BOT_NAME, self.MAIN_BOT_LINK = parse_markdown_link(
+            os.getenv('MAIN_BOT_LINK')
+        )
+        self.SUPPORT_BOT_NAME, self.SUPPORT_BOT_LINK = parse_markdown_link(
+            os.getenv('SUPPORT_BOT_LINK')
+        )
+        self.CHANNEL_NAME, self.CHANNEL_LINK = parse_markdown_link(
+            os.getenv('CHANNEL_LINK')
+        )
         
-        Raises:
-            ConfigValidationError: Если найдены проблемы в конфигурации
-        """
-        # Парсинг ссылок
-        cls.MAIN_BOT_NAME, cls.MAIN_BOT_LINK = parse_markdown_link(os.getenv('MAIN_BOT_LINK', ''))
-        cls.SUPPORT_BOT_NAME, cls.SUPPORT_BOT_LINK = parse_markdown_link(os.getenv('SUPPORT_BOT_LINK', ''))
-        cls.CHANNEL_NAME, cls.CHANNEL_LINK = parse_markdown_link(os.getenv('CHANNEL_LINK', ''))
+        if not self.BOT_TOKEN:
+            raise ConfigValidationError("BOT_TOKEN не установлен")
         
-        # Валидация конфигурации
-        problems = validate_config()
-        if problems:
-            error_msg = "Найдены проблемы в конфигурации:\n" + "\n".join(f"- {p}" for p in problems)
-            logger.error(error_msg)
-            raise ConfigValidationError(error_msg)
+        if not self.ADMIN_IDS:
+            raise ConfigValidationError("ADMIN_IDS не установлен")
+            
+        for admin_id in self.ADMIN_IDS:
+            if not validate_telegram_id(admin_id):
+                raise ConfigValidationError(f"Некорректный ADMIN_ID: {admin_id}")
         
-        # Очистка списка админов от пустых значений
-        cls.ADMIN_IDS = [aid.strip() for aid in cls.ADMIN_IDS if aid.strip()]
+        if not self.CHANNEL_ID:
+            raise ConfigValidationError("CHANNEL_ID не установлен")
+        elif not validate_telegram_id(self.CHANNEL_ID):
+            raise ConfigValidationError("Некорректный CHANNEL_ID")
         
-        # Проверка формата сообщений
-        if cls.DEFAULT_FORMAT not in ['markdown', 'html', 'plain', 'modern']:
-            logger.warning(f"Неизвестный формат сообщений: {cls.DEFAULT_FORMAT}, используется markdown")
-            cls.DEFAULT_FORMAT = 'markdown'
+        if self.TEST_CHAT_ID and not validate_telegram_id(self.TEST_CHAT_ID):
+            raise ConfigValidationError("Некорректный TEST_CHAT_ID")
         
-        logger.info("Конфигурация загружена успешно")
+        if self.DEFAULT_FORMAT not in ['markdown', 'html', 'plain', 'modern']:
+            logger.warning(
+                f"Неизвестный формат сообщений: {self.DEFAULT_FORMAT}, "
+                "используется markdown"
+            )
+            self.DEFAULT_FORMAT = 'markdown'
 
-# Загрузка конфигурации при импорте модуля
+# Создание экземпляра конфигурации
 try:
-    Config.load()
+    config = Config()
 except ConfigValidationError as e:
     logger.critical(f"Ошибка загрузки конфигурации: {e}")
     raise
