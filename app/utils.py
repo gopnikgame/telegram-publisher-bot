@@ -37,7 +37,8 @@ def setup_logging():
     
     # Форматирование
     formatter = logging.Formatter(
-        '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+        '%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+        datefmt='%Y-%m-%d %H:%M:%S'
     )
     main_handler.setFormatter(formatter)
     error_handler.setFormatter(formatter)
@@ -99,15 +100,21 @@ def format_message(text: str, format_type: str = 'markdown') -> str:
         
         if format_type == 'html':
             # Конвертируем markdown в HTML
-            text = text.replace('**', '</b>').replace('**', '<b>')
+            text = text.replace('**', '<b>').replace('**', '</b>')
             text = text.replace('&', '&amp;').replace('<', '&lt;').replace('>', '&gt;')
             return append_links_to_message(text, format_type)
         
         # Для markdown и modern
-        # Экранируем специальные символы, но сохраняем форматирование
-        special_chars = ['[', ']', '(', ')', '.', '!', '+', '-', '=', '{', '}', '|']
-        for char in special_chars:
-            text = text.replace(char, f'\\{char}')
+        if format_type == 'modern':
+            # Экранируем специальные символы для MarkdownV2
+            special_chars = ['_', '*', '[', ']', '(', ')', '~', '`', '>', '#', '+', '-', '=', '|', '{', '}', '.', '!']
+            for char in special_chars:
+                text = text.replace(char, f'\\{char}')
+        else:
+            # Экранируем только основные символы для обычного Markdown
+            special_chars = ['[', ']', '(', ')', '`']
+            for char in special_chars:
+                text = text.replace(char, f'\\{char}')
         
         # Обработка жирного текста
         if '**' in text:
