@@ -94,6 +94,7 @@ def append_links_to_message(text: str, format_type: str = 'markdown') -> str:
 
 def format_message(text: str, format_type: str = 'markdown') -> str:
     """Форматирование сообщения с поддержкой разных форматов."""
+    logger = logging.getLogger(__name__)  # Получаем логгер
     try:
         if not text:
             return ''
@@ -136,7 +137,6 @@ def format_message(text: str, format_type: str = 'markdown') -> str:
         return append_links_to_message(text, format_type)
 
     except Exception as e:
-        logger = logging.getLogger(__name__)
         logger.error(f"Ошибка форматирования сообщения: {e}")
         raise MessageFormattingError(f"Ошибка форматирования: {str(e)}")
 
