@@ -1,7 +1,13 @@
 services:
   telegram-publisher-bot:
-    image: telegram-publisher-bot
-    build: .
+    container_name: ${BOT_NAME}
+    image: telegram-publisher-bot:latest
+    build:
+      context: .  # Контекст сборки - текущая директория
+      dockerfile: Dockerfile  # Путь к Dockerfile в контексте сборки
+    volumes:
+      - ./data:/app/data
+    restart: always
     environment:
       BOT_TOKEN: ${BOT_TOKEN}
       ADMIN_IDS: ${ADMIN_IDS}
@@ -17,6 +23,5 @@ services:
       TEST_MODE: ${TEST_MODE}
       TEST_CHAT_ID: ${TEST_CHAT_ID}
       HTTPS_PROXY: ${HTTPS_PROXY}
-    volumes:
-      - ./logs:/app/logs
-    restart: always
+    security_opt:
+      - "apparmor:unconfined"
