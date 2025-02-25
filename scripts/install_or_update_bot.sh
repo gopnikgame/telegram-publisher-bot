@@ -3,16 +3,6 @@
 # Включаем строгий режим
 set -euo pipefail
 
-# Конфигурация
-REPO_URL="https://github.com/gopnikgame/telegram-publisher-bot.git"
-PROJECT_DIR="telegram-publisher-bot"
-INSTALL_DIR="/opt/$PROJECT_DIR" # Постоянная директория для установки
-BACKUP_DIR="./backups"
-LOG_DIR="./logs"
-#BOT_NAME="telegram-publisher-bot" # Теперь BOT_NAME устанавливается в .env
-CURRENT_USER="${SUDO_USER:-$USER}"
-CURRENT_TIME="2025-02-25 12:05:32" # Текущее время в UTC
-
 # Цвета для вывода
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -27,69 +17,16 @@ log() {
     echo -e "${!level}${message}${NC}"
 }
 
-# Функция для создания директорий
-create_directories() {
-    log "BLUE" "📂 Создание директорий..."
-
-    mkdir -p "$BACKUP_DIR"
-    mkdir -p "$LOG_DIR"
-}
-
-# Функция для резервного копирования и восстановления .env файла
-backup_restore_env() {
-    local action=$1
-
-    case $action in
-        "backup")
-            log "BLUE" "📑 Создание резервной копии .env файла..."
-            if [ -f ".env" ]; then
-                cp ".env" "$BACKUP_DIR/.env_$(date +%Y%m%d_%H%M%S)"
-                log "GREEN" "✅ Резервная копия .env создана: $BACKUP_DIR/.env_$(date +%Y%m%d_%H%M%S)"
-            else
-                log "YELLOW" "⚠️ Файл .env не найден, пропуск резервного копирования"
-            fi
-            ;;
-        "restore")
-            log "BLUE" "📑 Восстановление .env файла..."
-            if [ -f "$BACKUP_DIR/.env_$(date +%Y%m%d_%H%M%S)" ]; then
-                cp "$BACKUP_DIR/.env_$(date +%Y%m%d_%H%M%S)" ".env"
-                log "GREEN" "✅ .env файл восстановлен из: $BACKUP_DIR/.env_$(date +%Y%m%d_%H%M%S)"
-            else
-                log "YELLOW" "⚠️ Резервная копия .env не найдена, пропуск восстановления"
-            fi
-            ;;
-    esac
-}
-
-# Функция для обновления репозитория
-update_repo() {
-    log "BLUE" "🔄 Обновление репозитория..."
-
-    # Инициализация переменной STASHED
-    STASHED="false"
-
-    # Stash local changes to .env
-    if git diff --quiet HEAD -- .env; then
-        log "BLUE" "No local changes to .env"
+# Функция для запуска docker-compose
+docker_compose_cmd() {
+    if command -v docker-compose &> /dev/null; then
+        docker-compose "$@"
     else
-        log "BLUE" "Stashing local changes to .env"
-        git stash push -u .env
-        STASHED="true"
+        docker compose "$@"
     fi
-
-    git fetch
-    git reset --hard origin/main
-    log "GREEN" "✅ Репозиторий обновлен"
-
-     # Restore stashed changes to .env
-    if [[ "$STASHED" == "true" ]]; then
-        log "BLUE" "Restoring stashed changes to .env"
-        git stash pop
-    fi
-    log "GREEN" "✅ Репозиторий обновлен"
 }
 
-# Функция для управления конфигурацией .env
+# Функция для управления .env файлом
 manage_env_file() {
     local env_file=".env"
     local env_example=".env.example"
@@ -120,11 +57,11 @@ DEFAULT_FORMAT=markdown
 MAX_FILE_SIZE=20971520
 
 # Ссылки
-MAIN_BOT_NAME=Основной бот
+MAIN_BOT_NAME=Bot_VPNLine
 MAIN_BOT_LINK=
-SUPPORT_BOT_NAME=Техподдержка
+SUPPORT_BOT_NAME=SUPPORT
 SUPPORT_BOT_LINK=
-CHANNEL_NAME=Канал проекта
+CHANNEL_NAME=PUBLIC
 CHANNEL_LINK=
 
 # Тестовый режим
@@ -169,15 +106,45 @@ EOL
     return 0
 }
 
+# Функция для обновления репозитория
+update_repo() {
+    log "BLUE" "🔄 Обновление репозитория..."
+
+    # Инициализация переменной STASHED
+    STASHED="false"
+
+    # Stash local changes to .env
+    if git diff --quiet HEAD -- .env; then
+        log "BLUE" "No local changes to .env"
+    else
+        log "BLUE" "Stashing local changes to .env"
+        git stash push -u .env
+        STASHED="true"
+    fi
+
+    git fetch
+    git reset --hard origin/main
+    log "GREEN" "✅ Репозиторий обновлен"
+
+     # Restore stashed changes to .env
+    if [[ "$STASHED" == "true" ]]; then
+        log "BLUE" "Restoring stashed changes to .env"
+        git stash pop
+    fi
+    log "GREEN" "✅ Репозиторий обновлен"
+}
+
 # Функция для управления контейнером
 manage_container() {
     local action=$1
+
     log "BLUE" "🐳 Управление контейнером..."
 
     # Загружаем переменные окружения из файла .env
     if [ -f ".env" ]; then
         log "BLUE" "🔑 Загружаем переменные окружения из .env"
-        source .env
+        # Явно указываем кодировку UTF-8 при загрузке .env
+        export $(grep -v '^#' .env | xargs -0)
     else
         log "RED" "❌ Файл .env не найден. Создайте его и настройте переменные окружения."
         return 1
@@ -230,110 +197,69 @@ manage_container() {
     fi
 }
 
-# Функция для проверки статуса бота
-check_bot_status() {
-    log "BLUE" "🔍 Проверка статуса бота..."
-
-    # Проверяем, установлена ли переменная BOT_NAME
-    if [ -z "$BOT_NAME" ]; then
-        log "RED" "❌ Переменная BOT_NAME не установлена. Установите ее в файле .env"
-        return 1
-    fi
-
-    # Выводим значение переменной BOT_NAME
-    log "BLUE" "🔍 BOT_NAME: $BOT_NAME"
-
-    if docker ps | grep -q "$BOT_NAME"; then
-        log "GREEN" "✅ Бот запущен"
-        docker_compose_cmd -f docker/docker-compose.yml logs --tail=10
-    else
-        log "RED" "❌ Бот не запущен"
-        docker_compose_cmd -f docker/docker-compose.yml logs --tail=20
-    fi
-}
-
-# Функция для просмотра логов ошибок
-show_error_logs() {
-    log "BLUE" "❌ Показать логи ошибок..."
-    docker_compose_cmd -f docker/docker-compose.yml logs 2>&1 | grep -i "ERROR"
-}
-
-# Функция для очистки старых логов и бэкапов
-cleanup_old_files() {
-    log "BLUE" "🧹 Очистка старых файлов..."
-
-    if [ -d "$BACKUP_DIR" ]; then
-        cd "$BACKUP_DIR"
-        ls -t .env_* 2>/dev/null | tail -n +6 | xargs -r rm
-        cd ..
-    fi
-
-    find "$LOG_DIR" -name "*.log.*" -mtime +7 -delete 2>/dev/null || true
-
-    docker system prune -f --volumes >/dev/null 2>&1 || true
-
-    log "GREEN" "✅ Очистка завершена"
-}
-
 # Функция для принудительного удаления контейнера
 force_remove_container() {
-    log "YELLOW" "⚠️ Принудительное удаление контейнера..."
-    docker rm -f "$BOT_NAME" >/dev/null 2>&1 || true
+    if docker ps -a | grep -q "$BOT_NAME"; then
+        log "YELLOW" "⚠️ Принудительное удаление контейнера..."
+        docker stop "$BOT_NAME"
+        docker rm "$BOT_NAME"
+    fi
 }
 
-# Функция для вывода меню
-show_menu() {
-    echo "
-🤖 Telegram Publisher Bot
-========================
-1. ⬆️ Обновить из репозитория
-2. 📝 Создать или редактировать .env файл
-3. 🚀 Собрать и запустить контейнер бота
-4. ⏹️ Остановить и удалить контейнер бота
-5. 📊 Показать логи (все)
-6. ❌ Показать логи ошибок
-7. 🔄 Перезапустить бота
-8. 🧹 Очистить старые логи и бэкапы
-0. 🚪 Выйти
-"
+# Функция для очистки временных файлов
+cleanup() {
+    log "BLUE" "🧹 Очистка временных файлов..."
+    rm -rf /tmp/tmp.*
 }
 
-# Основной цикл
-while true; do
-    show_menu
-    read -r -p "Выберите действие (0-8): " choice
+# Получаем текущую дату и время в формате YYYY-MM-DD HH:MM:SS (UTC)
+CURRENT_TIME=$(date -u +%Y-%m-%d\ %H:%M:%S)
 
-    case "$choice" in
-        1)
-            update_repo
-            ;;
-        2)
-            manage_env_file
-            ;;
-        3)
-            manage_container "start"
-            ;;
-        4)
-            manage_container "stop"
-            ;;
-        5)
-            check_bot_status
-            ;;
-        6)
-            show_error_logs
-            ;;
-        7)
-            manage_container "restart"
-            ;;
-        8)
-            cleanup_old_files
-            ;;
-        0)
-            log "BLUE" "🚪 Выход..."
-            exit 0
-            ;;
-        *)
-            log "RED" "❌ Неверный выбор, попробуйте еще раз"
-            ;;
-    esac
-done
+# Получаем логин текущего пользователя
+CURRENT_USER=$(whoami)
+
+# Основное меню
+main_menu() {
+    while true; do
+        log "BLUE" "==== Основное меню ===="
+        log "BLUE" "1. 📝 Управление конфигурацией .env"
+        log "BLUE" "2. 🔄 Обновить репозиторий"
+        log "BLUE" "3. 🐳 Запустить контейнер"
+        log "BLUE" "4. ⏹️ Остановить контейнер"
+        log "BLUE" "5. 🔄 Перезапустить контейнер"
+        log "BLUE" "0. 🚪 Выход"
+
+        read -r -p "Выберите действие (0-5): " choice
+
+        case "$choice" in
+            1)
+                manage_env_file
+                ;;
+            2)
+                update_repo
+                ;;
+            3)
+                manage_container "start"
+                ;;
+            4)
+                manage_container "stop"
+                ;;
+            5)
+                manage_container "restart"
+                ;;
+            0)
+                log "BLUE" "🚪 Выход..."
+                break
+                ;;
+            *)
+                log "RED" "❌ Неверный выбор. Пожалуйста, выберите действие от 0 до 5."
+                ;;
+        esac
+    done
+}
+
+# Запускаем основное меню
+main_menu
+
+# Очистка временных файлов перед выходом
+cleanup
