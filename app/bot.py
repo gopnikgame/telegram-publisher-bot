@@ -115,35 +115,43 @@ def toggle_test_mode(update: Update, context: CallbackContext) -> None:
 def handle_message(update: Update, context: CallbackContext) -> None:
     """Обработчик входящих сообщений."""
     try:
+        logger.info(f"Получено сообщение: {update.message.text}")  # Логируем входящее сообщение
+
         # Определяем формат сообщения
         format_type = context.user_data.get('format', config.DEFAULT_FORMAT)
-        
+        logger.info(f"Формат сообщения: {format_type}")  # Логируем формат
+
         # Получаем целевой чат из декоратора test_mode
         target_chat = context.user_data['target_chat']
         is_test = context.user_data['is_test']
-        
+
         # Форматируем сообщение
         formatted_text = format_message(update.message.text, format_type)
-        
+        logger.info(f"Отформатированное сообщение: {formatted_text}")  # Логируем отформатированное сообщение
+
         # Определяем режим форматирования для Telegram
         parse_mode = None
         if format_type == 'html':
             parse_mode = ParseMode.HTML
         elif format_type in ['markdown', 'modern']:
             parse_mode = ParseMode.MARKDOWN_V2
-        
+
+        logger.info(f"Режим парсинга: {parse_mode}")  # Логируем режим парсинга
+
         # Отправляем сообщение
         sent_message = context.bot.send_message(
             chat_id=target_chat,
             text=formatted_text,
             parse_mode=parse_mode
         )
-        
+
+        logger.info(f"Сообщение отправлено: {sent_message.message_id}")  # Логируем ID отправленного сообщения
+
         # Отправляем подтверждение с информацией о режиме
         update.message.reply_text(
             f"✅ Сообщение {'протестировано' if is_test else 'опубликовано'}!"
         )
-        
+
     except Exception as e:
         logger.error(f"Ошибка отправки сообщения: {e}", exc_info=True)
         update.message.reply_text(f"❌ Ошибка: {str(e)}")
