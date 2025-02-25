@@ -7,6 +7,7 @@ services:
       dockerfile: Dockerfile  # Путь к Dockerfile относительно контекста сборки
     volumes:
       - ./data:/app/data
+      - /opt/telegram-publisher-bot/logs:/opt/telegram-publisher-bot/logs  # Add this line
     restart: always
     environment:
       BOT_TOKEN: ${BOT_TOKEN}
