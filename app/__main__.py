@@ -1,43 +1,31 @@
 import logging
-from telegram.ext import Updater
-from app.bot import setup_bot
+import os
+
+from telegram.ext import Application
+
+from app.bot import setup_handlers
 from app.config import config
 from app.utils import setup_logging
 
-def main():
-    # Настраиваем логирование
-    logger = setup_logging()
-    logger.info("Инициализация бота...")
+# Инициализация логирования
+setup_logging()
 
-    if not config.BOT_TOKEN:
-        logger.error("BOT_TOKEN не установлен в .env файле")
-        return
+logger = logging.getLogger(__name__)
 
-    try:
-        # Создаем updater
-        updater = Updater(
-            token=config.BOT_TOKEN,
-            use_context=True,
-            request_kwargs={
-                'read_timeout': 30,
-                'connect_timeout': 30,
-                'proxy_url': config.HTTPS_PROXY if config.HTTPS_PROXY else None
-            }
-        )
 
-        # Настраиваем бота
-        setup_bot(updater.dispatcher)
+def main() -> None:
+    """Start the bot."""
+    # Create the Application and pass it your bot's token.
+    application = Application.builder().token(config.BOT_TOKEN).build()
 
-        # Запускаем бота
-        logger.info("Бот запускается...")
-        updater.start_polling()
+    # Setup handlers
+    setup_handlers(application)
 
-        logger.info("Бот успешно запущен")
-        updater.idle()
+    # Run the bot until the user presses Ctrl-C
+    application.run_polling(allowed_updates=list(
+        [update.type for update in application.update_queue.queue])
+    )
 
-    except Exception as e:
-        logger.error(f"Ошибка запуска бота: {e}", exc_info=True)
-        raise
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     main()
