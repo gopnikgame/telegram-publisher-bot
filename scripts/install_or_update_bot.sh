@@ -113,7 +113,7 @@ manage_env_file() {
 BOT_TOKEN=
 ADMIN_IDS=
 CHANNEL_ID=
-BOT_NAME=telegram-publisher-bot # Добавлена переменная BOT_NAME
+BOT_NAME=telegram-publisher-bot
 
 # Настройки форматирования
 DEFAULT_FORMAT=markdown
@@ -143,10 +143,22 @@ EOL
     read -r -p "Редактировать .env файл сейчас? [Y/n] " response
     response=${response:-Y}
     if [[ "$response" =~ ^([yY][eE][sS]|[yY])$ ]]; then
+        # Добавляем логирование
         if command -v nano &> /dev/null; then
+            log "BLUE" "🚀 Запускаем nano..."
             nano "$env_file"
+            editor_result=$?
         else
+            log "BLUE" "🚀 Запускаем vi..."
             vi "$env_file"
+            editor_result=$?
+        fi
+
+        # Проверяем код возврата редактора
+        if [ "$editor_result" -ne 0 ]; then
+            log "RED" "❌ Редактор вернул код ошибки: $editor_result"
+            log "YELLOW" "⚠️ Файл .env необходимо настроить для работы бота."
+            return 1
         fi
     else
         log "YELLOW" "⚠️ Файл .env необходимо настроить для работы бота."
