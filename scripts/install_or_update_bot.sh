@@ -13,6 +13,10 @@ CYAN='\033[0;36m'
 WHITE='\033[0;37m'
 NC='\033[0m' # No Color
 
+# Файлы логов
+BOT_LOG_FILE="logs/bot.log"
+ERROR_LOG_FILE="logs/error.log"
+
 # Функция для логирования
 log() {
     local level=$1
@@ -254,13 +258,21 @@ main_menu() {
                 ;;
             5)
                 # Показать логи (все)
-                log "MAGENTA" "📊 Показываем все логи контейнера..."
-                docker logs "${BOT_NAME}"
+                log "MAGENTA" "📊 Показываем все логи бота..."
+                if [ -f "$BOT_LOG_FILE" ]; then
+                    cat "$BOT_LOG_FILE"
+                else
+                    log "RED" "❌ Файл логов не найден: $BOT_LOG_FILE"
+                fi
                 ;;
             6)
                 # Показать логи ошибок
-                log "RED" "❌ Показываем логи ошибок контейнера..."
-                docker logs "${BOT_NAME}" 2>&1 | grep -i "error"
+                log "RED" "❌ Показываем логи ошибок бота..."
+                if [ -f "$ERROR_LOG_FILE" ]; then
+                    cat "$ERROR_LOG_FILE"
+                else
+                    log "RED" "❌ Файл логов ошибок не найден: $ERROR_LOG_FILE"
+                fi
                 ;;
             7)
                 manage_container "restart"
