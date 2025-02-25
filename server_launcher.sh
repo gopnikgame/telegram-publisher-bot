@@ -35,6 +35,8 @@ if [ -d "$INSTALL_DIR" ]; then
     log "BLUE" "🚀 Директория установки существует: $INSTALL_DIR"
     # Переходим в директорию установки
     cd "$INSTALL_DIR"
+    # Добавляем права на выполнение скрипта install_or_update_bot.sh
+    chmod +x scripts/install_or_update_bot.sh
     # Запускаем скрипт install_or_update_bot.sh
     log "BLUE" "🚀 Запуск основного скрипта установки..."
     ./scripts/install_or_update_bot.sh
@@ -55,6 +57,8 @@ else
     cp -r . "$INSTALL_DIR"
     # Переходим в директорию установки
     cd "$INSTALL_DIR"
+    # Добавляем права на выполнение скрипта install_or_update_bot.sh
+    chmod +x scripts/install_or_update_bot.sh
     # Запускаем скрипт install_or_update_bot.sh
     log "BLUE" "🚀 Запуск основного скрипта установки..."
     ./scripts/install_or_update_bot.sh
