@@ -9,9 +9,9 @@ PROJECT_DIR="telegram-publisher-bot"
 INSTALL_DIR="/opt/$PROJECT_DIR" # Постоянная директория для установки
 BACKUP_DIR="./backups"
 LOG_DIR="./logs"
-BOT_NAME="telegram-publisher-bot"
+#BOT_NAME="telegram-publisher-bot" # Теперь BOT_NAME устанавливается в .env
 CURRENT_USER="${SUDO_USER:-$USER}"
-CURRENT_TIME="2025-02-25 11:21:35" # Текущее время в UTC
+CURRENT_TIME="2025-02-25 12:05:32" # Текущее время в UTC
 
 # Цвета для вывода
 RED='\033[0;31m'
@@ -110,6 +110,7 @@ manage_env_file() {
 BOT_TOKEN=
 ADMIN_IDS=
 CHANNEL_ID=
+BOT_NAME=telegram-publisher-bot # Добавлена переменная BOT_NAME
 
 # Настройки форматирования
 DEFAULT_FORMAT=markdown
@@ -158,6 +159,15 @@ manage_container() {
     local action=$1
     log "BLUE" "🐳 Управление контейнером..."
 
+    # Проверяем, установлена ли переменная BOT_NAME
+    if [ -z "$BOT_NAME" ]; then
+        log "RED" "❌ Переменная BOT_NAME не установлена. Установите ее в файле .env"
+        return 1
+    fi
+
+    # Выводим значение переменной BOT_NAME
+    log "BLUE" "🔍 BOT_NAME: $BOT_NAME"
+
     export DOCKER_UID DOCKER_GID
     export CREATED_BY="$CURRENT_USER"
     export CREATED_AT="$CURRENT_TIME"
@@ -199,6 +209,15 @@ manage_container() {
 # Функция для проверки статуса бота
 check_bot_status() {
     log "BLUE" "🔍 Проверка статуса бота..."
+
+    # Проверяем, установлена ли переменная BOT_NAME
+    if [ -z "$BOT_NAME" ]; then
+        log "RED" "❌ Переменная BOT_NAME не установлена. Установите ее в файле .env"
+        return 1
+    fi
+
+    # Выводим значение переменной BOT_NAME
+    log "BLUE" "🔍 BOT_NAME: $BOT_NAME"
 
     if docker ps | grep -q "$BOT_NAME"; then
         log "GREEN" "✅ Бот запущен"
