@@ -3,8 +3,8 @@ services:
     container_name: ${BOT_NAME}
     image: telegram-publisher-bot:latest
     build:
-      context: .  # Контекст сборки - текущая директория
-      dockerfile: Dockerfile  # Путь к Dockerfile в контексте сборки
+      context: ../  # Контекст сборки - родительская директория (т.е. /opt/telegram-publisher-bot)
+      dockerfile: Dockerfile  # Путь к Dockerfile относительно контекста сборки
     volumes:
       - ./data:/app/data
     restart: always
