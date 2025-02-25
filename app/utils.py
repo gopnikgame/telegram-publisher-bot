@@ -25,7 +25,7 @@ def setup_logging():
 
     # Основной файл лога
     main_handler = RotatingFileHandler(
-        'logs/bot.log',
+        '/opt/telegram-publisher-bot/logs/bot.log',
         maxBytes=1024 * 1024,  # 1 MB
         backupCount=5,
         encoding='utf-8'
@@ -33,7 +33,7 @@ def setup_logging():
 
     # Отдельный файл для ошибок
     error_handler = RotatingFileHandler(
-        'logs/error.log',
+        '/opt/telegram-publisher-bot/logs/error.log',
         maxBytes=1024 * 1024,
         backupCount=3,
         encoding='utf-8'
