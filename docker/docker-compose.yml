@@ -1,7 +1,7 @@
 services:
   telegram-publisher-bot:
     container_name: ${BOT_NAME}
-    image: telegram-publisher-bot:latest
+    # image: telegram-publisher-bot:latest  # Закомментировали строку с image
     build:
       context: ../  # Контекст сборки - родительская директория (т.е. /opt/telegram-publisher-bot)
       dockerfile: Dockerfile  # Путь к Dockerfile относительно контекста сборки
