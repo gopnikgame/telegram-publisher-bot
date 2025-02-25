@@ -15,32 +15,27 @@ class FileSizeError(Exception):
     pass
 
 def setup_logging():
-    log_dir = '/opt/telegram-publisher-bot/logs'  # Absolute path
+    """Настройка логирования с ротацией файлов."""
+    log_dir = '/opt/telegram-publisher-bot/logs'  # Use absolute path
 
     if not os.path.exists(log_dir):
-        try:
-            os.makedirs(log_dir)
-            print(f"Папка {log_dir} успешно создана")
-        except OSError as e:
-            print(f"Ошибка при создании папки {log_dir}: {e}")
-    else:
-        print(f"Папка {log_dir} уже существует") # add this line
+        os.makedirs(log_dir)
 
+    # Основной файл лога
     main_handler = RotatingFileHandler(
         '/opt/telegram-publisher-bot/logs/bot.log',
         maxBytes=1024 * 1024,  # 1 MB
         backupCount=5,
         encoding='utf-8'
     )
-    print("Создан main_handler") # add this line
 
+    # Отдельный файл для ошибок
     error_handler = RotatingFileHandler(
         '/opt/telegram-publisher-bot/logs/error.log',
         maxBytes=1024 * 1024,
         backupCount=3,
         encoding='utf-8'
     )
-    print("Создан error_handler") # add this line
     error_handler.setLevel(logging.ERROR)
 
     # Форматирование
