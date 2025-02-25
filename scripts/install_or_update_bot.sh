@@ -65,6 +65,9 @@ backup_restore_env() {
 update_repo() {
     log "BLUE" "🔄 Обновление репозитория..."
 
+    # Инициализация переменной STASHED
+    STASHED="false"
+
     # Stash local changes to .env
     if git diff --quiet HEAD -- .env; then
         log "BLUE" "No local changes to .env"
