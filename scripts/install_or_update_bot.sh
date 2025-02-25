@@ -14,8 +14,8 @@ WHITE='\033[0;37m'
 NC='\033[0m' # No Color
 
 # Файлы логов
-BOT_LOG_FILE="logs/bot.log"
-ERROR_LOG_FILE="logs/error.log"
+BOT_LOG_FILE="/opt/telegram-publisher-bot/logs/bot.log"
+ERROR_LOG_FILE="/opt/telegram-publisher-bot/logs/error.log"
 
 # Функция для логирования
 log() {
