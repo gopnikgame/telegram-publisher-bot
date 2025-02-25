@@ -16,8 +16,12 @@ class FileSizeError(Exception):
 
 def setup_logging():
     """Настройка логирования с ротацией файлов."""
-    if not os.path.exists('logs'):
-        os.makedirs('logs')
+    try:
+        if not os.path.exists('logs'):
+            os.makedirs('logs')
+            print("Папка logs успешно создана")  # Добавляем отладочный вывод
+    except OSError as e:
+        print(f"Ошибка при создании папки logs: {e}")  # Добавляем отладочный вывод
 
     # Основной файл лога
     main_handler = RotatingFileHandler(
