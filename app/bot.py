@@ -1,17 +1,19 @@
-from functools import wraps
-from telegram import Update, ParseMode
-from telegram.ext import (
-    Updater, 
-    CommandHandler, 
-    MessageHandler, 
-    Filters, 
-    CallbackContext
-)
-from app.config import config
-from app.utils import format_message
 import logging
 
-logger = logging.getLogger(__name__)
+from functools import wraps
+from telegram import Update
+from telegram.constants import ParseMode
+from telegram.ext import (
+    CallbackContext,
+    CommandHandler,
+    MessageHandler,
+    filters,
+)
+
+from app.config import config
+from app.utils import format_message, setup_logging  # Import setup_logging
+
+logger = logging.getLogger(__name__)  # Create logger after setup_logging
 
 def check_admin(func):
     """Декоратор для проверки прав администратора."""
