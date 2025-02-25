@@ -1,8 +1,8 @@
-FROM python:3.9-slim-buster
+FROM python:3.9-buster
 
 WORKDIR /app
 
-# Install pip
+# Install pip (optional, but recommended for consistency)
 RUN apt-get update && apt-get install -y python3-pip
 
 # Remove existing virtual environment (if any)
