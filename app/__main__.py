@@ -1,7 +1,7 @@
 import logging
 import os
 from telegram.ext import Application
-from app.bot import setup_handlers  # Функция для добавления обработчиков
+from app.bot import setup_bot_handlers  # Функция для добавления обработчиков
 from app.config import config
 from app.utils import setup_logging
 
@@ -28,11 +28,12 @@ async def main() -> None:
             .proxy_url(config.HTTPS_PROXY if config.HTTPS_PROXY else None)  # Прокси, если используется
             .build()
         )
+
         # Инициализируем бота
         await application.initialize()
-        
+
         # Устанавливаем обработчики из bot.py
-        setup_handlers(application)
+        setup_bot_handlers(application)
 
         # Запуск бота
         logger.info("Бот запускается...")
@@ -42,21 +43,12 @@ async def main() -> None:
     finally:
         # Останавливаем и завершаем работу бота
         await application.shutdown()
-        
-def run_bot():
-    # Явно создаем новый event loop
-    loop = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop)
-
-    try:
-        # Запускаем основную функцию
-        loop.run_until_complete(main())
-    except KeyboardInterrupt:
-        print("Бот остановлен пользователем")
-    finally:
-        # Закрываем event loop
-        loop.close()
 
 if __name__ == "__main__":
     import asyncio
-    asyncio.run(main())
+
+    try:
+        # Запускаем бота с помощью asyncio.run()
+        asyncio.run(main())
+    except KeyboardInterrupt:
+        print("Бот остановлен пользователем")
