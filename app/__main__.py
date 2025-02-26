@@ -28,8 +28,10 @@ async def main() -> None:
             .proxy_url(config.HTTPS_PROXY if config.HTTPS_PROXY else None)  # Прокси, если используется
             .build()
         )
-
-        # Настройка обработчиков
+        # Инициализируем бота
+        await application.initialize()
+        
+        # Устанавливаем обработчики из bot.py
         setup_handlers(application)
 
         # Запуск бота
@@ -37,9 +39,9 @@ async def main() -> None:
         await application.run_polling()
         logger.info("Бот успешно запущен")
 
-    except Exception as e:
-        logger.error(f"Ошибка запуска бота: {e}", exc_info=True)
-        raise
+    finally:
+        # Останавливаем и завершаем работу бота
+        await application.shutdown()
 
 if __name__ == "__main__":
     import asyncio
