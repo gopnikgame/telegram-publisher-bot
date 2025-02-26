@@ -7,6 +7,7 @@ from telegram.ext import (
     MessageHandler,
     filters,
     ContextTypes,
+    Application,
 )
 from app.config import config
 from app.utils import format_message, setup_logging
@@ -22,7 +23,7 @@ def check_admin(func):
         user_id = update.effective_user.id
         if user_id not in config.ADMIN_IDS:
             logger.warning(f"Попытка несанкционированного доступа от пользователя {user_id}")
-            await update.message.reply_text("⛔️ У вас нет доступа к этому боту.")
+            await update.message.reply_text("⛔ У вас нет доступа к этому боту.")
             return
         return await func(update, context, *args, **kwargs)
     return wrapped
@@ -144,7 +145,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         logger.error(f"Ошибка отправки сообщения: {e}", exc_info=True)
         await update.message.reply_text(f"❌ Ошибка: {str(e)}")
 
-def setup_handlers(application):
+def setup_handlers(application: Application) -> None:
     """Настройка обработчиков команд бота."""
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("help", help_command))
