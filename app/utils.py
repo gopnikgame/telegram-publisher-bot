@@ -42,9 +42,9 @@ def setup_logging():
     )
     error_handler.setLevel(logging.ERROR)
 
-    # Форматирование
+    # Форматирование - исправлена опечатка в levelname
     formatter = logging.Formatter(
-        '%Y-%m-%d %H:%M:%S - %(name)s - %(levellevel)s - %(message)s',
+        '%Y-%m-%d %H:%M:%S - %(name)s - %(levelname)s - %(message)s',
         datefmt='%Y-%m-%d %H:%M:%S'
     )
     main_handler.setFormatter(formatter)
@@ -102,6 +102,17 @@ def append_links_to_message(text: str, format_type: str = 'markdown') -> str:
     return text
 
 
+def is_html_formatted(text: str) -> bool:
+    """
+    Проверяет, содержит ли текст HTML-теги.
+    :param text: Проверяемый текст.
+    :return: True, если текст содержит HTML-теги.
+    """
+    # Проверяем наличие распространенных HTML-тегов
+    html_tags_pattern = re.compile(r'<(/?)(b|strong|i|em|u|s|strike|del|code|pre|a|br|p)(\s+[^>]*)?>')
+    return bool(html_tags_pattern.search(text))
+
+
 def format_message(text: str, format_type: str = 'markdown') -> str:
     """
     Форматирование сообщения с поддержкой разных форматов.
@@ -122,8 +133,14 @@ def format_message(text: str, format_type: str = 'markdown') -> str:
             return append_links_to_message(text, format_type)
 
         if format_type == 'html':
-            # Экранируем HTML
-            text = html.escape(text)
+            # Проверяем, содержит ли текст уже HTML-разметку
+            if is_html_formatted(text):
+                # Если текст уже содержит HTML-теги, не экранируем его
+                logger.info("Обнаружена HTML-разметка, пропускаем экранирование")
+            else:
+                # Если текст не содержит HTML-теги, экранируем специальные символы
+                logger.info("HTML-разметка не обнаружена, экранируем текст")
+                text = html.escape(text)
             return append_links_to_message(text, format_type)
 
         # Для markdown и modern
