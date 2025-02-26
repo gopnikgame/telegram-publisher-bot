@@ -144,7 +144,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         logger.error(f"Ошибка отправки сообщения: {e}", exc_info=True)
         await update.message.reply_text(f"❌ Ошибка: {str(e)}")
 
-def setup_bot_handlers(application):
+def setup_handlers(application):
     """Настройка обработчиков команд бота."""
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CommandHandler("help", help_command))
