@@ -67,9 +67,14 @@ def escape_markdown_v2(text: str) -> str:
     :param text: Исходный текст.
     :return: Экранированный текст для MarkdownV2.
     """
+    # Список специальных символов, которые нужно экранировать в Markdown V2
     escape_chars = ['_', '*', '[', ']', '(', ')', '~', '`', '>', '#', '+', '-', '=', '|', '{', '}', '.', '!']
+    
+    # Замена всех спец. символов на экранированные версии
     for char in escape_chars:
-        text = text.replace(char, f'\\{char}')
+        # Проверка, не экранирован ли уже символ
+        text = re.sub(r'(?<!\\)' + re.escape(char), r'\\' + char, text)
+    
     return text
 
 
@@ -93,9 +98,11 @@ def format_bot_links(format_type: str = 'markdown') -> str:
             # Экранируем специальные символы в URL и имени для MarkdownV2
             escaped_url = url
             escaped_name = name
-            for char in ['_', '*', '[', ']', '(', ')', '~', '`', '>', '#', '+', '-', '=', '|', '{', '}', '.', '!']:
-                escaped_url = escaped_url.replace(char, f'\\{char}')
-                escaped_name = escaped_name.replace(char, f'\\{char}')
+            escape_chars = ['_', '*', '[', ']', '(', ')', '~', '`', '>', '#', '+', '-', '=', '|', '{', '}', '.', '!']
+            for char in escape_chars:
+                # Проверка, не экранирован ли уже символ
+                escaped_url = re.sub(r'(?<!\\)' + re.escape(char), r'\\' + char, escaped_url)
+                escaped_name = re.sub(r'(?<!\\)' + re.escape(char), r'\\' + char, escaped_name)
             return f"[{escaped_name}]({escaped_url})"
 
     # Добавляем ссылки только если они настроены
@@ -130,6 +137,20 @@ def is_html_formatted(text: str) -> bool:
     # Проверяем наличие распространенных HTML-тегов
     html_tags_pattern = re.compile(r'<(/?)(b|strong|i|em|u|s|strike|del|code|pre|a|br|p)(\s+[^>]*)?>')
     return bool(html_tags_pattern.search(text))
+
+
+def is_already_escaped(text: str, pos: int, char: str) -> bool:
+    """
+    Проверяет, экранирован ли уже символ в позиции pos.
+    :param text: Текст для проверки
+    :param pos: Позиция символа
+    :param char: Сам символ
+    :return: True, если символ уже экранирован
+    """
+    if pos > 0 and text[pos-1] == '\\':
+        # Проверяем, чтобы этот обратный слеш не был экранированным сам
+        return pos <= 1 or text[pos-2] != '\\'
+    return False
 
 
 def format_message(text: str, format_type: str = 'markdown') -> str:
@@ -175,97 +196,68 @@ def format_message(text: str, format_type: str = 'markdown') -> str:
                 text = re.sub(r'`(.*?)`', r'<code>\1</code>', text)   # `код` -> <code>код</code>
             return append_links_to_message(text, format_type)
 
-        # Для markdown и modern
-        if format_type == 'modern':
-            # Обработка современного Discord-подобного форматирования для MarkdownV2
-            # Сохраняем текст с защитой форматирования
-            pattern_map = {
-                r'\*\*(.*?)\*\*': lambda m: f"*{escape_markdown_v2(m.group(1))}*",  # **жирный** -> *жирный*
-                r'__(.*?)__': lambda m: f"__{escape_markdown_v2(m.group(1))}__",    # __подчеркнутый__ 
-                r'_(.*?)_': lambda m: f"_{escape_markdown_v2(m.group(1))}_",        # _курсив_
-                r'~~(.*?)~~': lambda m: f"~{escape_markdown_v2(m.group(1))}~",      # ~~зачеркнутый~~ -> ~зачеркнутый~
-                r'`(.*?)`': lambda m: f"`{escape_markdown_v2(m.group(1))}`"         # `код`
-            }
-            
-            # Временно заменяем форматирование на маркеры
-            placeholder_map = {}
-            placeholder_counter = 0
-            
-            # Находим и заменяем форматирование на уникальные маркеры
-            for pattern in pattern_map.keys():
-                matches = re.finditer(pattern, text)
-                offset = 0  # Для корректировки позиций при замене
-                for match in matches:
-                    start, end = match.span()
-                    start += offset
-                    end += offset
-                    placeholder = f"__PLACEHOLDER_{placeholder_counter}__"
-                    placeholder_counter += 1
-                    
-                    # Сохраняем оригинальный текст и его форматирование
-                    formatted_text = pattern_map[pattern](match)
-                    placeholder_map[placeholder] = formatted_text
-                    
-                    # Заменяем оригинальный текст на маркер
-                    text = text[:start] + placeholder + text[end:]
-                    offset += len(placeholder) - (end - start)
-            
-            # Экранируем весь текст кроме маркеров
-            text = escape_markdown_v2(text)
-            
-            # Восстанавливаем форматированный текст
-            for placeholder, formatted_text in placeholder_map.items():
-                text = text.replace(escape_markdown_v2(placeholder), formatted_text)
-                
-        else:  # обычный markdown
-            # Преобразуем разметку Markdown в формат совместимый с MarkdownV2
-            pattern_map = {
-                r'\*\*(.*?)\*\*': lambda m: f"*{m.group(1)}*",        # **жирный** -> *жирный*
-                r'__(.*?)__': lambda m: f"__{m.group(1)}__",           # __подчеркнутый__ 
-                r'_(.*?)_': lambda m: f"_{m.group(1)}_",               # _курсив_
-                r'\*(.*?)\*': lambda m: f"*{m.group(1)}*",             # *курсив*
-                r'~~(.*?)~~': lambda m: f"~{m.group(1)}~",             # ~~зачеркнутый~~ -> ~зачеркнутый~
-                r'`(.*?)`': lambda m: f"`{m.group(1)}`"                # `код`
-            }
-            
-            # Подход похож на modern, но экранируем только специальные символы вне форматирования
-            placeholder_map = {}
-            placeholder_counter = 0
-            
-            # Находим и заменяем форматирование на уникальные маркеры
-            for pattern in pattern_map.keys():
-                matches = re.finditer(pattern, text)
-                offset = 0
-                for match in matches:
-                    start, end = match.span()
-                    start += offset
-                    end += offset
-                    placeholder = f"__PLACEHOLDER_{placeholder_counter}__"
-                    placeholder_counter += 1
-                    
-                    # Сохраняем только содержимое внутри форматирования
-                    inner_content = match.group(1)
-                    formatted_text = pattern_map[pattern](match)
-                    placeholder_map[placeholder] = formatted_text
-                    
-                    text = text[:start] + placeholder + text[end:]
-                    offset += len(placeholder) - (end - start)
-            
-            # Экранируем только специальные символы, которые могут мешать парсингу Markdown
-            escape_chars = ['[', ']', '(', ')', '`', '>', '#', '+', '-', '=', '|', '{', '}', '.', '!']
-            for char in escape_chars:
-                text = text.replace(char, f'\\{char}')
-            
-            # Восстанавливаем форматированный текст
-            for placeholder, formatted_text in placeholder_map.items():
-                # Восстанавливаем плейсхолдеры с учетом возможного экранирования
-                escaped_placeholder = placeholder
-                for char in escape_chars:
-                    if char in placeholder:
-                        escaped_placeholder = escaped_placeholder.replace(char, f'\\{char}')
-                text = text.replace(escaped_placeholder, formatted_text)
+        # Для markdown и modern режимов
+        result = ""
+        
+        # Обработка форматирования
+        # Простой подход: сначала экранируем все специальные символы
+        # и затем обрабатываем форматирование
+        
+        # Список специальных символов для экранирования
+        special_chars = ['_', '*', '[', ']', '(', ')', '~', '`', '>', '#', '+', '-', '=', '|', '{', '}', '.', '!']
+        
+        # 1. Сначала обрабатываем имеющиеся форматы
+        # Сохраняем форматированные блоки и заменяем их плейсхолдерами
+        placeholders = {}
+        placeholder_id = 0
+        
+        # Регулярное выражение для поиска форматирования
+        format_patterns = [
+            (r'\*\*(.*?)\*\*', '*{}*'),     # **жирный** -> *жирный*
+            (r'__(.*?)__', '_{}_'),         # __подчеркнутый__ -> _подчеркнутый_
+            (r'\*(.*?)\*', '*{}*'),         # *курсив* -> *курсив*
+            (r'_(.*?)_', '_{}_'),           # _курсив_ -> _курсив_
+            (r'~~(.*?)~~', '~{}~'),         # ~~зачеркнутый~~ -> ~зачеркнутый~
+            (r'`(.*?)`', '`{}`')            # `код` -> `код`
+        ]
 
-        return append_links_to_message(text, format_type)
+        # Работаем с копией текста
+        processed_text = text
+        
+        for pattern, format_template in format_patterns:
+            # Находим все совпадения в тексте
+            matches = list(re.finditer(pattern, processed_text))
+            
+            # Обрабатываем совпадения с конца, чтобы не нарушать индексы
+            for match in reversed(matches):
+                start, end = match.span()
+                content = match.group(1)
+                
+                # Создаем плейсхолдер
+                placeholder = f"__PLACEHOLDER_{placeholder_id}__"
+                placeholder_id += 1
+                
+                # Экранируем содержимое форматированного блока
+                escaped_content = content
+                for char in special_chars:
+                    escaped_content = re.sub(r'(?<!\\)' + re.escape(char), r'\\' + char, escaped_content)
+                
+                # Заменяем форматированный текст на плейсхолдер
+                placeholders[placeholder] = format_template.format(escaped_content)
+                processed_text = processed_text[:start] + placeholder + processed_text[end:]
+        
+        # 2. Экранируем все оставшиеся специальные символы
+        for char in special_chars:
+            processed_text = re.sub(r'(?<!\\)' + re.escape(char), r'\\' + char, processed_text)
+        
+        # 3. Восстанавливаем форматированные блоки
+        for placeholder, formatted_text in placeholders.items():
+            processed_text = processed_text.replace(placeholder, formatted_text)
+        
+        result = processed_text
+        
+        # Добавляем ссылки в конце сообщения
+        return append_links_to_message(result, format_type)
 
     except Exception as e:
         logger.error(f"Ошибка форматирования сообщения: {e}", exc_info=True)
