@@ -34,9 +34,7 @@ async def main() -> None:
 
         # Запуск бота
         logger.info("Бот запускается...")
-        await application.run_polling(
-            allowed_updates=Application.ALL_UPDATE_TYPES  # Разрешаем все типы обновлений
-        )
+        await application.run_polling()
         logger.info("Бот успешно запущен")
 
     except Exception as e:
