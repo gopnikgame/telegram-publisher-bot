@@ -29,9 +29,6 @@ async def main() -> None:
             .build()
         )
 
-        # Инициализируем бота
-        await application.initialize()
-
         # Устанавливаем обработчики из bot.py
         setup_handlers(application)
 
@@ -41,9 +38,13 @@ async def main() -> None:
         await application.updater.start_polling()
         logger.info("Бот успешно запущен")
 
+    except Exception as e:
+        logger.error(f"Ошибка при запуске бота: {e}", exc_info=True)
+
     finally:
         # Останавливаем и завершаем работу бота
         await application.updater.stop()
+        await application.stop()
         await application.shutdown()
 
 if __name__ == "__main__":
