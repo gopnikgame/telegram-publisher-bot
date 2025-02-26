@@ -1,7 +1,7 @@
 import logging
 import os
 from telegram.ext import Application
-from app.bot import setup_bot_handlers  # Функция для добавления обработчиков
+from app.bot import setup_handlers  # Функция для добавления обработчиков
 from app.config import config
 from app.utils import setup_logging
 
@@ -33,15 +33,17 @@ async def main() -> None:
         await application.initialize()
 
         # Устанавливаем обработчики из bot.py
-        setup_bot_handlers(application)
+        setup_handlers(application)
 
         # Запуск бота
         logger.info("Бот запускается...")
-        await application.run_polling()
+        await application.start()
+        await application.updater.start_polling()
         logger.info("Бот успешно запущен")
 
     finally:
         # Останавливаем и завершаем работу бота
+        await application.updater.stop()
         await application.shutdown()
 
 if __name__ == "__main__":
