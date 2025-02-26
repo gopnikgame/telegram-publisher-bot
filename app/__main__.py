@@ -29,6 +29,9 @@ async def main() -> None:
     )
 
     try:
+        # Инициализируем приложение
+        await application.initialize()
+
         # Устанавливаем обработчики из bot.py
         setup_handlers(application)
 
