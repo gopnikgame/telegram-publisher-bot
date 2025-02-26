@@ -42,6 +42,20 @@ async def main() -> None:
     finally:
         # Останавливаем и завершаем работу бота
         await application.shutdown()
+        
+def run_bot():
+    # Явно создаем новый event loop
+    loop = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop)
+
+    try:
+        # Запускаем основную функцию
+        loop.run_until_complete(main())
+    except KeyboardInterrupt:
+        print("Бот остановлен пользователем")
+    finally:
+        # Закрываем event loop
+        loop.close()
 
 if __name__ == "__main__":
     import asyncio
