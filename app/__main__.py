@@ -16,19 +16,19 @@ async def main() -> None:
         logger.error("BOT_TOKEN не установлен в .env файле")
         return
 
-    try:
-        # Создаем экземпляр Application
-        application = (
-            Application.builder()
-            .token(config.BOT_TOKEN)
-            .connect_timeout(30)  # Таймаут соединения
-            .read_timeout(30)     # Таймаут чтения
-            .get_updates_connect_timeout(30)  # Таймаут соединения для обновлений
-            .get_updates_read_timeout(30)     # Таймаут чтения для обновлений
-            .proxy_url(config.HTTPS_PROXY if config.HTTPS_PROXY else None)  # Прокси, если используется
-            .build()
-        )
+    # Создаем экземпляр Application
+    application = (
+        Application.builder()
+        .token(config.BOT_TOKEN)
+        .connect_timeout(30)  # Таймаут соединения
+        .read_timeout(30)     # Таймаут чтения
+        .get_updates_connect_timeout(30)  # Таймаут соединения для обновлений
+        .get_updates_read_timeout(30)     # Таймаут чтения для обновлений
+        .proxy_url(config.HTTPS_PROXY if config.HTTPS_PROXY else None)  # Прокси, если используется
+        .build()
+    )
 
+    try:
         # Устанавливаем обработчики из bot.py
         setup_handlers(application)
 
@@ -38,12 +38,16 @@ async def main() -> None:
         await application.updater.start_polling()
         logger.info("Бот успешно запущен")
 
+        # Ожидание завершения работы
+        await application.updater.idle()
+
     except Exception as e:
         logger.error(f"Ошибка при запуске бота: {e}", exc_info=True)
 
     finally:
         # Останавливаем и завершаем работу бота
-        await application.updater.stop()
+        if application.updater.running:
+            await application.updater.stop()
         await application.stop()
         await application.shutdown()
 
