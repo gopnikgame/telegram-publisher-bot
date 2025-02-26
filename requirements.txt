@@ -1,2 +1,2 @@
+python-dotenv==0.21.0
 python-telegram-bot==21.10
-python-dotenv==0.19.2
