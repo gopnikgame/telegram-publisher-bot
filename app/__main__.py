@@ -1,7 +1,9 @@
 import logging
 import os
+import signal
+import asyncio
 from telegram.ext import Application
-from app.bot import setup_handlers  # Функция для добавления обработчиков
+from app.bot import setup_handlers
 from app.config import config
 from app.utils import setup_logging
 
@@ -41,8 +43,20 @@ async def main() -> None:
         await application.updater.start_polling()
         logger.info("Бот успешно запущен")
 
-        # Ожидание завершения работы
-        await application.idle()
+        # Ожидание завершения работы (замена idle())
+        stop_signal = asyncio.Event()
+        
+        def signal_handler(sig, frame):
+            logger.info("Получен сигнал остановки, завершаю работу...")
+            stop_signal.set()
+            
+        # Регистрируем обработчики сигналов
+        signal.signal(signal.SIGINT, signal_handler)
+        signal.signal(signal.SIGTERM, signal_handler)
+        
+        # Ожидаем сигнал завершения
+        logger.info("Бот работает. Нажмите Ctrl+C для остановки")
+        await stop_signal.wait()
 
     except Exception as e:
         logger.error(f"Ошибка при запуске бота: {e}", exc_info=True)
