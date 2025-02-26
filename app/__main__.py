@@ -48,7 +48,8 @@ async def main() -> None:
         # Останавливаем и завершаем работу бота
         if application.updater.running:
             await application.updater.stop()
-        await application.stop()
+        if application.running:
+            await application.stop()
         await application.shutdown()
 
 if __name__ == "__main__":
