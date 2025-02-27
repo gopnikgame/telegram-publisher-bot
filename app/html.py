@@ -56,7 +56,7 @@ def markdown_to_html(text: str) -> str:
     text = re.sub(r'~~(.*?)~~', r'<s>\1</s>', text)  # ~~зачеркнутый~~ -> <s>зачеркнутый</s>
     text = re.sub(r'`(.*?)`', r'<code>\1</code>', text)  # `код` -> <code>код</code>
 
-    return text + "<br><br>" #  Добавляем <br><br> в конце
+    return text + "\n\n" #  Заменяем <br><br> на \n\n
 
 
 def modern_to_html(text: str) -> str:
@@ -73,4 +73,4 @@ def modern_to_html(text: str) -> str:
     text = re.sub(r'~(.*?)~', r'<s>\1</s>', text)  # ~зачеркнутый~ -> <s>зачеркнутый</s>
     text = re.sub(r'`(.*?)`', r'<code>\1</code>', text)  # `код` -> <code>код</code>
 
-    return text + "<br><br>" #  Добавляем <br><br> в конце
+    return text + "\n\n" #  Заменяем <br><br> на \n\n
