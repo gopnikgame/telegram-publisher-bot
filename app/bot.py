@@ -32,19 +32,29 @@ def test_mode(func):
     """Декоратор для обработки тестового режима."""
     @wraps(func)
     async def wrapped(update: Update, context: ContextTypes.DEFAULT_TYPE, *args, **kwargs):
-        # Проверяем, включен ли тестовый режим
-        is_test = context.user_data.get('test_mode', config.TEST_MODE)
-        
-        # Если тестовый режим включен, но TEST_CHAT_ID не настроен
-        if is_test and not config.TEST_CHAT_ID:
-            await update.message.reply_text("⚠️ Тестовый режим включен, но TEST_CHAT_ID не настроен")
+        try:
+            # Проверяем, включен ли тестовый режим
+            is_test = context.user_data.get('test_mode', config.TEST_MODE)
+
+            # Если тестовый режим включен, но TEST_CHAT_ID не настроен
+            if is_test and not config.TEST_CHAT_ID:
+                await update.message.reply_text("⚠️ Тестовый режим включен, но TEST_CHAT_ID не настроен")
+                return
+
+            # Добавляем информацию о тестовом режиме в context
+            context.user_data['is_test'] = is_test
+            context.user_data['target_chat'] = config.TEST_CHAT_ID if is_test else config.CHANNEL_ID
+
+            result = await func(update, context, *args, **kwargs)
+
+            if is_test:
+                await update.message.reply_text("✅ Сообщение отправлено в тестовый чат")
+
+            return result
+        except Exception as e:
+            logger.exception("Ошибка в декораторе test_mode")
+            await update.message.reply_text(f"Произошла ошибка в тестовом режиме: {e}")
             return
-        
-        # Добавляем информацию о тестовом режиме в context
-        context.user_data['is_test'] = is_test
-        context.user_data['target_chat'] = config.TEST_CHAT_ID if is_test else config.CHANNEL_ID
-        
-        return await func(update, context, *args, **kwargs)
     return wrapped
 
 @check_admin
