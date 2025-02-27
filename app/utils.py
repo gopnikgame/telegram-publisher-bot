@@ -110,7 +110,7 @@ def append_links_to_message(text: str, format_type: str = 'markdown') -> str:
     """
     links = format_bot_links(format_type)
     if links:
-        return f"{text}<br><br>{links}" #  Добавляем <br> для переноса строк
+        return f"{text}{links}" #  Убираем <br>
     return text
 
 
