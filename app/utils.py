@@ -1,4 +1,3 @@
-```python
 import logging
 import os
 import re
@@ -165,8 +164,3 @@ def check_file_size(size: int, max_size: Optional[int] = None) -> bool:
     if size > limit:
         raise FileSizeError(f"Размер файла ({size} байт) превышает лимит ({limit} байт)")
     return True
-```
-
-**Исправление:**
-
-Проблема была в функции `format_link`. Строки `elif format_type == 'plain':` и `else:` были сдвинуты влево. Я исправил отступы, сдвинув их вправо, чтобы они находились внутри функции `format_link`.
