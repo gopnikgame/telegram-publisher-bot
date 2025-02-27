@@ -7,9 +7,7 @@ from logging.handlers import RotatingFileHandler
 import html  # Для экранирования HTML
 
 from app.config import config
-from .html import is_html_formatted, format_html
-from .markdown import escape_markdown_v2
-from .modern import format_modern
+from .html import is_html_formatted, format_html, markdown_to_html, modern_to_html
 
 
 class MessageFormattingError(Exception):
@@ -101,7 +99,7 @@ def format_bot_links(format_type: str = 'markdown') -> str:
     if config.CHANNEL_LINK and config.CHANNEL_NAME:
         links.append(format_link(config.CHANNEL_NAME, config.CHANNEL_LINK, format_type))
 
-    return ' | '.join(links) if links else ""  # Возвращаем разделитель |
+    return ' | '.join(links) if links else ""
 
 
 def append_links_to_message(text: str, format_type: str = 'markdown') -> str:
@@ -112,7 +110,7 @@ def append_links_to_message(text: str, format_type: str = 'markdown') -> str:
     """
     links = format_bot_links(format_type)
     if links:
-        return f"{text}\n\n{links}"
+        return f"{text}<br><br>{links}" #  Добавляем <br> для переноса строк
     return text
 
 
@@ -147,9 +145,9 @@ def format_message(text: str, format_type: str = 'markdown') -> str:
         # Для markdown и modern режимов
         if format_type in ['markdown', 'modern']:
             if format_type == 'markdown':
-                result = escape_markdown_v2(text)
+                result = markdown_to_html(text)
             else:
-                result = format_modern(text)
+                result = modern_to_html(text)
 
             # Добавляем ссылки в конце сообщения
             return append_links_to_message(result, format_type)
