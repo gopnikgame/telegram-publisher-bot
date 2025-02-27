@@ -136,6 +136,10 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             text=formatted_text,
             parse_mode=parse_mode
         )
+    except Exception as e:
+        logger.exception("Ошибка при обработке сообщения")
+        await update.message.reply_text(f"Произошла ошибка: {e}")
+
 
 def setup_handlers(application: Application) -> None:
     """Настройка обработчиков команд бота."""
