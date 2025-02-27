@@ -75,15 +75,6 @@ def format_bot_links(format_type: str = 'markdown') -> str:
 
     links = []
 
-def format_bot_links(format_type: str = 'markdown') -> str:
-    """
-    Форматирование ссылок ботов и канала.
-    :param format_type: Тип форматирования (markdown, html, plain, modern).
-    """
-    from app.config import config
-
-    links = []
-
     def format_link(name: str, url: str, format_type: str) -> str:
         if format_type == 'html':
             name = html.escape(name)
@@ -111,7 +102,7 @@ def format_bot_links(format_type: str = 'markdown') -> str:
         links.append(format_link(config.CHANNEL_NAME, config.CHANNEL_LINK, format_type))
 
     if format_type in ['markdown', 'modern']:
-        return '\\n'.join(links) if links else ""  # Используем перенос строки вместо |
+        return '\\n'.join(links).replace('\\\\n', '\\n') if links else ""  # Используем перенос строки вместо |, и убираем двойное экранирование
     else:
         return ' | '.join(links) if links else ""
 
