@@ -5,6 +5,7 @@ from datetime import datetime
 from typing import List, Optional
 from logging.handlers import RotatingFileHandler
 import html  # Для экранирования HTML
+import urllib.parse  # Для экранирования URL
 
 from app.config import config
 from .html import is_html_formatted, format_html, markdown_to_html, modern_to_html
@@ -74,17 +75,12 @@ def format_bot_links(format_type: str = 'markdown') -> str:
     links = []
 
     def format_link(name: str, url: str, format_type: str) -> str:
-        if format_type == 'html':
-            name = html.escape(name)
-            url = html.escape(url)
-            return f'<a href="{url}">{name}</a>'
-        elif format_type == 'plain':
+        if format_type == 'plain':
             return f'{name}: {url}'
-        else:  # markdown и modern
-            # Экранируем специальные символы в URL и имени для MarkdownV2
-            escaped_url = html.escape(url)  # Экранируем URL для HTML
-            escaped_name = html.escape(name)  # Экранируем name для HTML
-            return f"[{escaped_name}]({escaped_url})"
+        else:  # html, markdown и modern
+            name = html.escape(name)
+            url = urllib.parse.quote_plus(url)  # Экранируем URL для HTML
+            return f'<a href="{url}">{name}</a>'
 
     # Добавляем ссылки только если они настроены
     if config.MAIN_BOT_LINK and config.MAIN_BOT_NAME:
@@ -105,7 +101,7 @@ def append_links_to_message(text: str, format_type: str = 'markdown') -> str:
     """
     links = format_bot_links(format_type)
     if links:
-        return f"{text}{links}"  # Убираем <br>
+        return f"{text}{links}" #  Убираем <br>
     return text
 
 
