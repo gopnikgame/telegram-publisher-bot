@@ -101,10 +101,7 @@ def format_bot_links(format_type: str = 'markdown') -> str:
     if config.CHANNEL_LINK and config.CHANNEL_NAME:
         links.append(format_link(config.CHANNEL_NAME, config.CHANNEL_LINK, format_type))
 
-    if format_type in ['markdown', 'modern']:
-        return '\\n'.join(links).replace('\\\\n', '\\n') if links else ""  # Используем перенос строки вместо |, и убираем двойное экранирование
-    else:
-        return ' | '.join(links) if links else ""
+    return ' | '.join(links) if links else ""  # Возвращаем разделитель |
 
 
 def append_links_to_message(text: str, format_type: str = 'markdown') -> str:
