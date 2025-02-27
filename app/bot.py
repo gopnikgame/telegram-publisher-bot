@@ -125,10 +125,10 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
         logger.info(f"Отформатированное сообщение: {formatted_text}")  # Логируем отформатированное сообщение
         # Определяем режим форматирования для Telegram
         parse_mode = None
-        if format_type == 'html':
-            parse_mode = ParseMode.HTML
-        elif format_type in ['markdown', 'modern']:
-            parse_mode = ParseMode.MARKDOWN_V2
+        if format_type == 'plain':
+            parse_mode = None  # Для plain не используем parse_mode
+        else:
+            parse_mode = ParseMode.HTML #  Для всех остальных используем HTML
         logger.info(f"Режим парсинга: {parse_mode}")  # Логируем режим парсинга
         # Отправляем сообщение
         sent_message = await context.bot.send_message(
@@ -136,14 +136,6 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE) -> 
             text=formatted_text,
             parse_mode=parse_mode
         )
-        logger.info(f"Сообщение отправлено: {sent_message.message_id}")  # Логируем ID отправленного сообщения
-        # Отправляем подтверждение с информацией о режиме
-        await update.message.reply_text(
-            f"✅ Сообщение {'протестировано' if is_test else 'опубликовано'}!"
-        )
-    except Exception as e:
-        logger.error(f"Ошибка отправки сообщения: {e}", exc_info=True)
-        await update.message.reply_text(f"❌ Ошибка: {str(e)}")
 
 def setup_handlers(application: Application) -> None:
     """Настройка обработчиков команд бота."""
