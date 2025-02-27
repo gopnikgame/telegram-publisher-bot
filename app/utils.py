@@ -1,3 +1,4 @@
+```python
 import logging
 import os
 import re
@@ -74,17 +75,17 @@ def format_bot_links(format_type: str = 'markdown') -> str:
     links = []
 
     def format_link(name: str, url: str, format_type: str) -> str:
-           if format_type == 'html':
-               name = html.escape(name)
-               url = html.escape(url)
-               return f'<a href="{url}">{name}</a>'
-            elif format_type == 'plain':
-                return f'{name}: {url}'
-            else:  # markdown и modern
-                # Экранируем специальные символы в URL и имени для MarkdownV2
-                escaped_url = html.escape(url)  # Экранируем URL для HTML
-                escaped_name = html.escape(name) # Экранируем name для HTML
-                return f"[{escaped_name}]({escaped_url})"
+        if format_type == 'html':
+            name = html.escape(name)
+            url = html.escape(url)
+            return f'<a href="{url}">{name}</a>'
+        elif format_type == 'plain':
+            return f'{name}: {url}'
+        else:  # markdown и modern
+            # Экранируем специальные символы в URL и имени для MarkdownV2
+            escaped_url = html.escape(url)  # Экранируем URL для HTML
+            escaped_name = html.escape(name)  # Экранируем name для HTML
+            return f"[{escaped_name}]({escaped_url})"
 
     # Добавляем ссылки только если они настроены
     if config.MAIN_BOT_LINK and config.MAIN_BOT_NAME:
@@ -105,7 +106,7 @@ def append_links_to_message(text: str, format_type: str = 'markdown') -> str:
     """
     links = format_bot_links(format_type)
     if links:
-        return f"{text}{links}" #  Убираем <br>
+        return f"{text}{links}"  # Убираем <br>
     return text
 
 
@@ -164,3 +165,8 @@ def check_file_size(size: int, max_size: Optional[int] = None) -> bool:
     if size > limit:
         raise FileSizeError(f"Размер файла ({size} байт) превышает лимит ({limit} байт)")
     return True
+```
+
+**Исправление:**
+
+Проблема была в функции `format_link`. Строки `elif format_type == 'plain':` и `else:` были сдвинуты влево. Я исправил отступы, сдвинув их вправо, чтобы они находились внутри функции `format_link`.
