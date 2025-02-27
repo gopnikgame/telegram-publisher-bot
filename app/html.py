@@ -46,17 +46,24 @@ def markdown_to_html(text: str) -> str:
     :param text: Исходный текст в формате Markdown.
     :return: Отформатированный текст в HTML.
     """
-    text = html.escape(text)  # Экранируем HTML-специальные символы
+    try:
+        text = html.escape(text)  # Экранируем HTML-специальные символы
 
-    # Заменяем Markdown-разметку на HTML-теги
-    text = re.sub(r'\*\*(.*?)\*\*', r'<b>\1</b>', text)  # **жирный** -> <b>жирный</b>
-    text = re.sub(r'__(.*?)__', r'<u>\1</u>', text)  # __подчеркнутый__ -> <u>подчеркнутый</u>
-    text = re.sub(r'_(.*?)_', r'<i>\1</i>', text)  # _курсив_ -> <i>курсив</i>
-    text = re.sub(r'\*(.*?)\*', r'<i>\1</i>', text)  # *курсив* -> <i>курсив</i>
-    text = re.sub(r'~~(.*?)~~', r'<s>\1</s>', text)  # ~~зачеркнутый~~ -> <s>зачеркнутый</s>
-    text = re.sub(r'`(.*?)`', r'<code>\1</code>', text)  # `код` -> <code>код</code>
+        # Заменяем Markdown-разметку на HTML-теги
+        text = re.sub(r'\*\*(.*?)\*\*', r'<b>\1</b>', text)  # **жирный** -> <b>жирный</b>
+        text = re.sub(r'__(.*?)__', r'<u>\1</u>', text)  # __подчеркнутый__ -> <u>подчеркнутый</u>
+        text = re.sub(r'_(.*?)_', r'<i>\1</i>', text)  # _курсив_ -> <i>курсив</i>
+        text = re.sub(r'\*(.*?)\*', r'<i>\1</i>', text)  # *курсив* -> <i>курсив</i>
+        text = re.sub(r'~~(.*?)~~', r'<s>\1</s>', text)  # ~~зачеркнутый~~ -> <s>зачеркнутый</s>
+        text = re.sub(r'`(.*?)`', r'<code>\1</code>', text)  # `код` -> <code>код</code>
+        text = re.sub(r'\[(.*?)\]\((.*?)\)', r'<a href="\2">\1</a>', text)  # [текст](ссылка) -> <a href="ссылка">текст</a>
 
-    return text + "\n\n" #  Заменяем <br><br> на \n\n
+        # Удаляем лишние пробелы и добавляем \n\n, если необходимо
+        text = text.strip() + "\n\n" if not text.endswith("\n\n") else text
+        return text
+    except Exception as e:
+        logger.error(f"Ошибка преобразования Markdown в HTML: {e}")
+        return text
 
 
 def modern_to_html(text: str) -> str:
@@ -65,12 +72,18 @@ def modern_to_html(text: str) -> str:
     :param text: Исходный текст в формате Modern.
     :return: Отформатированный текст в HTML.
     """
-    text = html.escape(text)  # Экранируем HTML-специальные символы
+    try:
+        text = html.escape(text)  # Экранируем HTML-специальные символы
 
-    # Заменяем Modern-разметку на HTML-теги (примерно так же, как и Markdown)
-    text = re.sub(r'\*(.*?)\*', r'<b>\1</b>', text)  # *жирный* -> <b>жирный</b>
-    text = re.sub(r'_(.*?)_', r'<u>\1</u>', text)  # _подчеркнутый_ -> <u>подчеркнутый</u>
-    text = re.sub(r'~(.*?)~', r'<s>\1</s>', text)  # ~зачеркнутый~ -> <s>зачеркнутый</s>
-    text = re.sub(r'`(.*?)`', r'<code>\1</code>', text)  # `код` -> <code>код</code>
+        # Заменяем Modern-разметку на HTML-теги
+        text = re.sub(r'\*(.*?)\*', r'<b>\1</b>', text)  # *жирный* -> <b>жирный</b>
+        text = re.sub(r'_(.*?)_', r'<u>\1</u>', text)  # _подчеркнутый_ -> <u>подчеркнутый</u>
+        text = re.sub(r'~(.*?)~', r'<s>\1</s>', text)  # ~зачеркнутый~ -> <s>зачеркнутый</s>
+        text = re.sub(r'`(.*?)`', r'<code>\1</code>', text)  # `код` -> <code>код</code>
 
-    return text + "\n\n" #  Заменяем <br><br> на \n\n
+        # Удаляем лишние пробелы и добавляем \n\n, если необходимо
+        text = text.strip() + "\n\n" if not text.endswith("\n\n") else text
+        return text
+    except Exception as e:
+        logger.error(f"Ошибка преобразования Modern в HTML: {e}")
+        return text
