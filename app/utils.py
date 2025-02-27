@@ -74,22 +74,17 @@ def format_bot_links(format_type: str = 'markdown') -> str:
     links = []
 
     def format_link(name: str, url: str, format_type: str) -> str:
-        if format_type == 'html':
-            name = html.escape(name)
-            url = html.escape(url)
-            return f'<a href="{url}">{name}</a>'
-        elif format_type == 'plain':
-            return f'{name}: {url}'
-        else:  # markdown и modern
-            # Экранируем специальные символы в URL и имени для MarkdownV2
-            escaped_url = url
-            escaped_name = name
-            escape_chars = ['_', '*', '[', ']', '(', ')', '~', '`', '>', '#', '+', '-', '=', '|', '{', '}', '.', '!']
-            for char in escape_chars:
-                # Проверка, не экранирован ли уже символ
-                escaped_url = re.sub(r'(?<!\\)' + re.escape(char), r'\\' + char, escaped_url)
-                escaped_name = re.sub(r'(?<!\\)' + re.escape(char), r'\\' + char, escaped_name)
-            return f"[{escaped_name}]({escaped_url})"
+           if format_type == 'html':
+               name = html.escape(name)
+               url = html.escape(url)
+               return f'<a href="{url}">{name}</a>'
+            elif format_type == 'plain':
+                return f'{name}: {url}'
+            else:  # markdown и modern
+                # Экранируем специальные символы в URL и имени для MarkdownV2
+                escaped_url = html.escape(url)  # Экранируем URL для HTML
+                escaped_name = html.escape(name) # Экранируем name для HTML
+                return f"[{escaped_name}]({escaped_url})"
 
     # Добавляем ссылки только если они настроены
     if config.MAIN_BOT_LINK and config.MAIN_BOT_NAME:
