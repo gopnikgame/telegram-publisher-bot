@@ -40,12 +40,6 @@ def format_html(text: str) -> str:
     return text
 
 
-import re
-import html
-import logging
-
-logger = logging.getLogger(__name__)
-
 def markdown_to_telegram_html(text: str) -> str:
     """
     Преобразует текст в формате Markdown в HTML, поддерживаемый Telegram.
