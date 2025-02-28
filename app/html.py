@@ -40,7 +40,7 @@ def format_html(text: str) -> str:
     return text
 
 
-def markdown_to_telegram_html(text: str) -> str:
+def markdown_to_html(text: str) -> str:
     """
     Преобразует текст в формате Markdown в HTML, поддерживаемый Telegram.
     :param text: Исходный текст в формате Markdown.
