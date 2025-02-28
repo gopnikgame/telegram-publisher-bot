@@ -74,26 +74,22 @@ def format_bot_links(format_type: str = 'markdown') -> str:
 
     links = []
 
-    def format_link(name: str, url: str, format_type: str) -> str:
-        if format_type == 'plain':
-            return f'{name}: {url}'
-        else:  # html, markdown и modern
-            name = html.escape(name)
-            # Вместо quote_plus используется html.escape, чтобы не искажать URL
-            url = html.escape(url)
-            return f'<a href="{url}">{name}</a>'
+    def format_link(name: str, url: str) -> str:
+        # Всегда используем HTML-формат для ссылок
+        name = html.escape(name)
+        url = html.escape(url)
+        return f'<a href="{url}">{name}</a>'
 
-    # Добавляем ссылки только если они настроены
-    if config.MAIN_BOT_LINK and config.MAIN_BOT_NAME:
-        links.append(format_link(config.MAIN_BOT_NAME, config.MAIN_BOT_LINK, format_type))
-    if config.SUPPORT_BOT_LINK and config.SUPPORT_BOT_NAME:
-        links.append(format_link(config.SUPPORT_BOT_NAME, config.SUPPORT_BOT_LINK, format_type))
+    # Добавляем ссылки в нужном порядке: PUBLIC | VPNLine | SUPPORT
     if config.CHANNEL_LINK and config.CHANNEL_NAME:
-        links.append(format_link(config.CHANNEL_NAME, config.CHANNEL_LINK, format_type))
+        links.append(format_link(config.CHANNEL_NAME, config.CHANNEL_LINK))
+    if config.MAIN_BOT_LINK and config.MAIN_BOT_NAME:
+        links.append(format_link(config.MAIN_BOT_NAME, config.MAIN_BOT_LINK))
+    if config.SUPPORT_BOT_LINK and config.SUPPORT_BOT_NAME:
+        links.append(format_link(config.SUPPORT_BOT_NAME, config.SUPPORT_BOT_LINK))
 
     return ' | '.join(links) if links else ""
-
-
+    
 def append_links_to_message(text: str, format_type: str = 'markdown') -> str:
     """
     Добавляет отформатированные ссылки к сообщению.
