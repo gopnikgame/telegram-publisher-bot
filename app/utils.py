@@ -98,9 +98,8 @@ def append_links_to_message(text: str, format_type: str = 'markdown') -> str:
     """
     links = format_bot_links(format_type)
     if links:
-        return f"{text}{links}"  #  Убираем <br>
+        return f"{text}\n\n{links}"  # Добавляем две строки перед ссылками
     return text
-
 
 def format_message(text: str, format_type: str = 'markdown') -> str:
     """
