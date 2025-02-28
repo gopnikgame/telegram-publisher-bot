@@ -79,7 +79,8 @@ def format_bot_links(format_type: str = 'markdown') -> str:
             return f'{name}: {url}'
         else:  # html, markdown и modern
             name = html.escape(name)
-            url = urllib.parse.quote_plus(url)  # Экранируем URL для HTML
+            # Вместо quote_plus используется html.escape, чтобы не искажать URL
+            url = html.escape(url)
             return f'<a href="{url}">{name}</a>'
 
     # Добавляем ссылки только если они настроены
@@ -101,7 +102,7 @@ def append_links_to_message(text: str, format_type: str = 'markdown') -> str:
     """
     links = format_bot_links(format_type)
     if links:
-        return f"{text}{links}" #  Убираем <br>
+        return f"{text}{links}"  #  Убираем <br>
     return text
 
 
