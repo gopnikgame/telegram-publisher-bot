@@ -40,17 +40,32 @@ def format_html(text: str) -> str:
     return text
 
 
-def markdown_to_html(text: str) -> str:
+import re
+import html
+import logging
+
+logger = logging.getLogger(__name__)
+
+def markdown_to_telegram_html(text: str) -> str:
+    """
+    Преобразует текст в формате Markdown в HTML, поддерживаемый Telegram.
+    :param text: Исходный текст в формате Markdown.
+    :return: Отформатированный текст в HTML, совместимый с Telegram.
+    """
     try:
         if not text:
             return ""
 
-        # Экранирование HTML
+        # Шаг 1: Экранируем HTML-специальные символы, кроме уже существующих HTML-тегов
         def escape_html_except_tags(match):
             content = match.group(1)
             return f"<{html.escape(match.group(2))}>{html.escape(content)}</{html.escape(match.group(2))}>"
+
+        # Экранируем всё, кроме содержимого внутри HTML-тегов
         text = re.sub(r"<(.*?)>(.*?)</\1>", escape_html_except_tags, text)
         text = html.escape(text)
+
+        # Шаг 2: Заменяем Markdown-разметку на поддерживаемые HTML-теги
 
         # Супержирный текст ***текст*** -> <b><i>текст</i></b>
         text = re.sub(r'\*\*\*(.*?)\*\*\*', r'<b><i>\1</i></b>', text)
@@ -73,26 +88,31 @@ def markdown_to_html(text: str) -> str:
         # Ссылки [текст](ссылка) -> <a href="ссылка">текст</a>
         text = re.sub(r'\[(.*?)\]\((.*?)\)', r'<a href="\2">\1</a>', text)
 
-        # Цитаты >цитата -> <blockquote>цитата</blockquote>
-        text = re.sub(r'^>\s?(.*)$', r'<blockquote>\1</blockquote>', text, flags=re.MULTILINE)
+        # Шаг 3: Обработка неподдерживаемых элементов
 
-        # Ненумерованные списки - пункт -> <ul><li>пункт</li></ul>
-        text = re.sub(r'^([-*])\s(.*)$', r'<ul><li>\2</li></ul>', text, flags=re.MULTILINE)
+        # Заголовки # заголовок -> Текст с символом #
+        text = re.sub(r'^(\#{1,6})\s(.*)$', r'\1 \2\n\n', text, flags=re.MULTILINE)
 
-        # Нумерованные списки 1. пункт -> <ol><li>пункт</li></ol>
-        text = re.sub(r'^(\d+)\.\s(.*)$', r'<ol><li>\2</li></ol>', text, flags=re.MULTILINE)
+        # Цитаты >цитата -> Текст с символом >
+        text = re.sub(r'^>\s?(.*)$', r'> \1\n', text, flags=re.MULTILINE)
 
-        # Заголовки # заголовок -> <h1>заголовок</h1>
-        for i in range(1, 7):
-            text = re.sub(rf'^{"#" * i}\s(.*)$', rf'<h{i}>\1</h{i}>', text, flags=re.MULTILINE)
+        # Ненумерованные списки - пункт -> Текст с отступом
+        text = re.sub(r'^([-*])\s(.*)$', r'• \2\n', text, flags=re.MULTILINE)
 
-        # Горизонтальные линии *** -> <hr>
-        text = re.sub(r'^[\*\-\_]{3,}$', '<hr>', text, flags=re.MULTILINE)
+        # Нумерованные списки 1. пункт -> Текст с номером
+        text = re.sub(r'^(\d+)\.\s(.*)$', r'\1. \2\n', text, flags=re.MULTILINE)
 
-        # Нормализация переносов строк
+        # Горизонтальные линии *** -> Два переноса строки
+        text = re.sub(r'^[\*\-\_]{3,}$', '\n\n', text, flags=re.MULTILINE)
+
+        # Шаг 4: Удаляем лишние пробелы и нормализуем переносы строк
         text = text.strip()
-        text = re.sub(r'\n{2,}', '\n\n', text)
+        text = re.sub(r'\n{3,}', '\n\n', text)  # Сжимаем множественные переносы строк
 
+        return text
+
+    except Exception as e:
+        logger.error(f"Ошибка преобразования Markdown в HTML для Telegram: {e}")
         return text
 
     except Exception as e:
