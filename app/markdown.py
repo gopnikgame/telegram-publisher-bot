@@ -54,12 +54,37 @@ def process_emoji(text: str) -> str:
 
 def process_bold_text(text: str) -> str:
     """Обрабатывает жирный текст в формате Markdown и преобразует его в HTML."""
-    # Обработка жирного текста (** вариант)
-    # Ищем паттерны вида **текст** с пробелами или без между звездочками и текстом
-    pattern = r'\*\*(.*?)\*\*'
-    text = re.sub(pattern, r'<b>\1</b>', text)
+    # Обрабатываем корректно случаи, когда ** занимают отдельную строку
+    lines = text.split('\n')
+    in_bold = False
+    result = []
+    bold_text = []
     
-    return text
+    for line in lines:
+        if line.strip() == '**' and not in_bold:
+            in_bold = True
+            continue
+        elif line.strip() == '**' and in_bold:
+            in_bold = False
+            # Оборачиваем накопленный текст в тег <b>
+            if bold_text:
+                result.append(f'<b>{" ".join(bold_text)}</b>')
+                bold_text = []
+            continue
+        
+        if in_bold:
+            bold_text.append(line)
+        else:
+            # Обрабатываем inline **текст**
+            line = re.sub(r'\*\*(.*?)\*\*', r'<b>\1</b>', line)
+            result.append(line)
+    
+    # Если остался незакрытый тег
+    if bold_text:
+        for line in bold_text:
+            result.append(line)
+    
+    return '\n'.join(result)
 
 def process_italic_text(text: str) -> str:
     """Обрабатывает курсивный текст в формате Markdown и преобразует его в HTML."""
@@ -79,12 +104,37 @@ def process_bold_italic_text(text: str) -> str:
 
 def process_strikethrough_text(text: str) -> str:
     """Обрабатывает зачеркнутый текст в формате Markdown и преобразует его в HTML."""
-    # Обработка зачеркнутого текста (~~ вариант)
-    # Ищем паттерны вида ~~текст~~ с пробелами или без между тильдами и текстом
-    pattern = r'~~(.*?)~~'
-    text = re.sub(pattern, r'<s>\1</s>', text)
+    # Обрабатываем корректно случаи, когда ~~ занимают отдельную строку
+    lines = text.split('\n')
+    in_strike = False
+    result = []
+    strike_text = []
     
-    return text
+    for line in lines:
+        if line.strip() == '~~' and not in_strike:
+            in_strike = True
+            continue
+        elif line.strip() == '~~' and in_strike:
+            in_strike = False
+            # Оборачиваем накопленный текст в тег <s>
+            if strike_text:
+                result.append(f'<s>{" ".join(strike_text)}</s>')
+                strike_text = []
+            continue
+        
+        if in_strike:
+            strike_text.append(line)
+        else:
+            # Обрабатываем inline ~~текст~~
+            line = re.sub(r'~~(.*?)~~', r'<s>\1</s>', line)
+            result.append(line)
+    
+    # Если остался незакрытый тег
+    if strike_text:
+        for line in strike_text:
+            result.append(line)
+    
+    return '\n'.join(result)
 
 def process_underline_text(text: str) -> str:
     """Обрабатывает подчеркнутый текст в формате Markdown и преобразует его в HTML."""
@@ -127,20 +177,23 @@ def process_quotes(text: str) -> str:
         else:
             # Конец цитаты, если была активна
             if in_quote:
-                result.append(f'<blockquote>{" ".join(quote_lines)}</blockquote>')
+                # Telegram поддерживает только <i> для цитат, не <blockquote>
+                result.append(f'<i>{" ".join(quote_lines)}</i>')
                 quote_lines = []
                 in_quote = False
             result.append(line)
     
     # Если цитата не была закрыта
     if in_quote:
-        result.append(f'<blockquote>{" ".join(quote_lines)}</blockquote>')
+        result.append(f'<i>{" ".join(quote_lines)}</i>')
     
     return '\n'.join(result)
 
 def process_headers(text: str) -> str:
-    """Обрабатывает заголовки в формате Markdown и преобразует их в HTML."""
-    # Обработка заголовков (# вариант)
+    """
+    Обрабатывает заголовки Markdown и преобразует их в формат, поддерживаемый Telegram.
+    Telegram не поддерживает теги <h1>-<h6>, поэтому используем жирный текст для заголовков.
+    """
     lines = text.split('\n')
     result = []
     
@@ -150,7 +203,13 @@ def process_headers(text: str) -> str:
         if header_match:
             level = len(header_match.group(1))
             content = header_match.group(2)
-            result.append(f'<h{level}>{content}</h{level}>')
+            # Используем жирный текст вместо <h1>-<h6> для совместимости с Telegram
+            if level == 1:
+                result.append(f'<b>{content}</b>')  # H1 - просто жирный
+            elif level == 2:
+                result.append(f'<b>{content}</b>')  # H2 - жирный 
+            else:
+                result.append(f'<b>{content}</b>')  # H3-H6 - жирный
         else:
             result.append(line)
     
@@ -159,8 +218,15 @@ def process_headers(text: str) -> str:
 def process_links(text: str) -> str:
     """Обрабатывает ссылки в формате Markdown и преобразует их в HTML."""
     # Обработка ссылок [текст](url)
-    pattern = r'\[(.*?)\]\((.*?)\)'
-    text = re.sub(pattern, r'<a href="\2">\1</a>', text)
+    pattern = r'\[(.*?)\]\((.*?)(?:\s+"(.*?)")?\)'
+    
+    def replace_link(match):
+        text = match.group(1)
+        url = match.group(2)
+        # Игнорируем title (Telegram не поддерживает title в <a>)
+        return f'<a href="{url}">{text}</a>'
+    
+    text = re.sub(pattern, replace_link, text)
     
     return text
 
