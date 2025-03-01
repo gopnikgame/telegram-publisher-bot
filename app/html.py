@@ -7,8 +7,8 @@ from .markdown import (
     extract_and_save_placeholders, restore_placeholders,
     process_bold_text, process_italic_text, process_strikethrough_text,
     process_underline_text, process_bold_italic_text, process_links, process_code,
-    # Импорты перенесенных функций
-    process_simple_horizontal_rules, format_simple_tables, format_simple_lists
+    process_simple_horizontal_rules, format_simple_tables, format_simple_lists,
+    process_images  # Добавлен импорт новой функции
 )
 
 logger = logging.getLogger(__name__)  # Получаем логгер
@@ -120,6 +120,7 @@ def markdown_to_html(text: str) -> str:
         text = process_emoji(text)
         text = process_headers(text)
         text = process_quotes(text)
+        text = process_images(text)  # Добавлена обработка изображений
         
         # Шаг 10: Базовое форматирование текста
         logger.info(f"Текст перед обработкой форматирования: {text[:100]}...")
