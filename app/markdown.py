@@ -5,7 +5,8 @@ import emoji  # Зависимость для работы с эмодзи
 
 logger = logging.getLogger(__name__)
 
-def process_markdown_lists(text: str) -> str: """Обрабатывает списки в формате Markdown."""
+def process_markdown_lists(text: str) -> str:
+    """Обрабатывает списки в формате Markdown."""
     lines = text.split('\n')
     processed_lines = []
     in_list = False
@@ -48,7 +49,8 @@ def process_markdown_lists(text: str) -> str: """Обрабатывает спи
         processed_lines.append('</ul>' if list_type == 'ul' else '</ol>')
     return '\n'.join(processed_lines)
 
-def process_markdown_code_blocks(text: str) -> str: """Обрабатывает блоки кода в формате Markdown."""
+def process_markdown_code_blocks(text: str) -> str:
+    """Обрабатывает блоки кода в формате Markdown."""
     pattern = r'```(.*?)\n(.*?)```'
     def replace_code_block(match):
         language = match.group(1).strip() or "code"
@@ -57,7 +59,8 @@ def process_markdown_code_blocks(text: str) -> str: """Обрабатывает 
     text = re.sub(pattern, replace_code_block, text, flags=re.DOTALL)
     return text
 
-def process_markdown_tables(text: str) -> str: """Обрабатывает таблицы в формате Markdown."""
+def process_markdown_tables(text: str) -> str:
+    """Обрабатывает таблицы в формате Markdown."""
     lines = text.split('\n')
     processed_lines = []
     in_table = False
@@ -83,7 +86,8 @@ def process_markdown_tables(text: str) -> str: """Обрабатывает та�
         processed_lines.append(processed_table)
     return '\n'.join(processed_lines)
 
-def format_markdown_table(table_lines: list) -> str: """Форматирует таблицу Markdown в более читаемый вид для Telegram."""
+def format_markdown_table(table_lines: list) -> str:
+    """Форматирует таблицу Markdown в более читаемый вид для Telegram."""
     if len(table_lines) < 3:  # Неполная таблица, возвращаем как есть
         return '\n'.join(table_lines)
     header = table_lines[0]
@@ -95,32 +99,37 @@ def format_markdown_table(table_lines: list) -> str: """Форматирует �
         rows.append(' | '.join(cells))
     return f"{formatted_header}\n{'—' * 20}\n" + '\n'.join(rows)
 
-def process_emoji(text: str) -> str: """Обрабатывает эмодзи и их текстовые коды."""
+def process_emoji(text: str) -> str:
+    """Обрабатывает эмодзи и их текстовые коды."""
     pattern = r':([a-zA-Z0-9_\-+]+):'  # Заменяем текстовые коды эмодзи на Unicode символы
     def replace_emoji_code(match):
         emoji_code = match.group(1)
         try:
             return emoji.emojize(f':{emoji_code}:', language='alias')
         except Exception as e:
-            logger.warning(f"Не удалось преобразовать эмодзи код :{emoji_code}: - {e}")  # Если эмодзи не найден, возвращаем исходный текст
-            return f':{emoji_code}:'
+            logger.warning(f"Не удалось преобразовать эмодзи код :{emoji_code}: - {e}")
+            return f':{emoji_code}:'  # Если эмодзи не найден, возвращаем исходный текст
     return re.sub(pattern, replace_emoji_code, text)
 
-def process_headers(text: str) -> str: """Обрабатывает заголовки Markdown (# Заголовок)."""
+def process_headers(text: str) -> str:
+    """Обрабатывает заголовки Markdown (# Заголовок)."""
     text = re.sub(r'^#\s+(.*)$', r'<b><u>\1</u></b>', text, flags=re.MULTILINE)  # Заголовок первого уровня
     text = re.sub(r'^#{2}\s+(.*)$', r'<b>\1</b>', text, flags=re.MULTILINE)  # Заголовок второго уровня
     text = re.sub(r'^#{3,6}\s+(.*)$', r'<i><b>\1</b></i>', text, flags=re.MULTILINE)  # Заголовки третьего и более уровней
     return text
 
-def process_quotes(text: str) -> str: """Обрабатывает цитаты Markdown (> текст)."""
+def process_quotes(text: str) -> str:
+    """Обрабатывает цитаты Markdown (> текст)."""
     text = re.sub(r'^>\s*(.*)$', r'<blockquote>\1</blockquote>', text, flags=re.MULTILINE)  # Обработка простых цитат
     return text
 
-def process_horizontal_rules(text: str) -> str: """Обрабатывает горизонтальные линии (---, ***, ___)."""
+def process_horizontal_rules(text: str) -> str:
+    """Обрабатывает горизонтальные линии (---, ***, ___)."""
     text = re.sub(r'^([-*_]{3,})$', r'\n<i>— — — — — — — — — —</i>\n', text, flags=re.MULTILINE)  # Заменяем на визуальный разделитель
     return text
 
-def extract_and_save_placeholders(text: str, pattern: str) -> (str, dict): """Извлекает блоки, соответствующие шаблону, и заменяет их плейсхолдерами."""
+def extract_and_save_placeholders(text: str, pattern: str) -> (str, dict):
+    """Извлекает блоки, соответствующие шаблону, и заменяет их плейсхолдерами."""
     placeholders = {}
     def save_match(match):
         placeholder = f"__PLACEHOLDER_{len(placeholders)}__"
@@ -129,7 +138,8 @@ def extract_and_save_placeholders(text: str, pattern: str) -> (str, dict): """И
     modified_text = re.sub(pattern, save_match, text, flags=re.DOTALL)
     return modified_text, placeholders
 
-def restore_placeholders(text: str, placeholders: dict) -> str: """Восстанавливает плейсхолдеры обратно в текст."""
+def restore_placeholders(text: str, placeholders: dict) -> str:
+    """Восстанавливает плейсхолдеры обратно в текст."""
     for placeholder, original in placeholders.items():
         text = text.replace(placeholder, original)
     return text
