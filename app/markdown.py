@@ -116,16 +116,6 @@ def process_quotes(text):
         
     return '\n'.join(result_lines)
 
-def process_horizontal_rules(text):
-    """
-    Обработка горизонтальных линий.
-    ---, ***, ___
-    """
-    text = re.sub(r'^---+$', '<hr>', text, flags=re.MULTILINE)
-    text = re.sub(r'^\*\*\*+$', '<hr>', text, flags=re.MULTILINE)
-    text = re.sub(r'^___+$', '<hr>', text, flags=re.MULTILINE)
-    
-    return text
 
 def process_bold_text(text):
     """
