@@ -6,7 +6,6 @@ from datetime import datetime
 from typing import Dict, Optional, List, Union
 
 from telegram import Bot, InlineKeyboardButton, InlineKeyboardMarkup, Update
-# Правильный импорт ParseMode из нового местоположения
 from telegram.constants import ParseMode
 from telegram.error import BadRequest, TelegramError
 from telegram.ext import CallbackContext, CallbackQueryHandler, CommandHandler, filters, MessageHandler, Application
@@ -52,25 +51,25 @@ def check_admin(user_id: int) -> bool:
     """
     return user_id in ADMIN_IDS
 
-
 def create_footer() -> str:
     """Создает подпись для сообщений."""
     footer_parts = []
     
-    # Безопасно проверяем наличие атрибутов в объекте config
-    if hasattr(config, 'PUBLIC_CHANNEL_LINK') and config.PUBLIC_CHANNEL_LINK:
-        footer_parts.append(f'<a href="{config.PUBLIC_CHANNEL_LINK}">PUBLIC</a>')
+    # Добавляем ссылку на канал
+    if hasattr(config, 'CHANNEL_LINK') and config.CHANNEL_LINK and hasattr(config, 'CHANNEL_NAME') and config.CHANNEL_NAME:
+        footer_parts.append(f'<a href="{config.CHANNEL_LINK}">{config.CHANNEL_NAME}</a>')
     
-    if hasattr(config, 'BOT_LINK') and config.BOT_LINK:
-        footer_parts.append(f'<a href="{config.BOT_LINK}">Bot_VPNLine</a>')
+    # Добавляем ссылку на основной бот
+    if hasattr(config, 'MAIN_BOT_LINK') and config.MAIN_BOT_LINK and hasattr(config, 'MAIN_BOT_NAME') and config.MAIN_BOT_NAME:
+        footer_parts.append(f'<a href="{config.MAIN_BOT_LINK}">{config.MAIN_BOT_NAME}</a>')
     
-    if hasattr(config, 'SUPPORT_LINK') and config.SUPPORT_LINK:
-        footer_parts.append(f'<a href="{config.SUPPORT_LINK}">SUPPORT</a>')
+    # Добавляем ссылку на техподдержку
+    if hasattr(config, 'SUPPORT_BOT_LINK') and config.SUPPORT_BOT_LINK and hasattr(config, 'SUPPORT_BOT_NAME') and config.SUPPORT_BOT_NAME:
+        footer_parts.append(f'<a href="{config.SUPPORT_BOT_LINK}">{config.SUPPORT_BOT_NAME}</a>')
     
     if footer_parts:
         return "\n" + " | ".join(footer_parts)
     return ""
-
 
 async def start(update: Update, context: CallbackContext) -> None:
     """Обрабатывает команду /start."""
@@ -107,7 +106,6 @@ async def start(update: Update, context: CallbackContext) -> None:
             chat_id=chat_id, 
             text="👋 Привет! Я бот для форматирования текста. Используйте /format для выбора формата."
         )
-
 
 async def help_command(update: Update, context: CallbackContext) -> None:
     """Обрабатывает команду /help."""
@@ -149,45 +147,244 @@ async def help_command(update: Update, context: CallbackContext) -> None:
             chat_id=chat_id, 
             text="Справка по форматированию доступна в /format. Выберите формат для вашего текста."
         )
-
-
+        
 async def format_command(update: Update, context: CallbackContext) -> None:
     """Обрабатывает команду /format."""
     chat_id = update.effective_chat.id
     
-    # Создаем клавиатуру с вариантами форматирования
+    # Создаем клавиатуру для выбора формата
     keyboard = [
         [
             InlineKeyboardButton("Markdown", callback_data="format_markdown"),
-            InlineKeyboardButton("HTML", callback_data="format_html")
+            InlineKeyboardButton("HTML", callback_data="format_html"),
         ],
         [
-            InlineKeyboardButton("Modern", callback_data="format_modern")
-        ]
+            InlineKeyboardButton("Modern", callback_data="format_modern"),
+        ],
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     
-    # Отправляем сообщение с кнопками
+    # Отправляем сообщение с клавиатурой
     await context.bot.send_message(
         chat_id=chat_id,
-        text="Выберите предпочтительный формат для обработки текста:",
+        text="Выберите формат для отправки сообщений:",
         reply_markup=reply_markup
     )
+    
+    # Устанавливаем состояние пользователя
+    user_id = update.effective_user.id
+    user_states[user_id] = STATE_AWAITING_FORMAT
 
+async def test_mode(update: Update, context: CallbackContext) -> None:
+    """Включает/выключает тестовый режим."""
+    user_id = update.effective_user.id
+    chat_id = update.effective_chat.id
+    
+    # Проверка на право использования команды
+    if not check_admin(user_id):
+        await context.bot.send_message(
+            chat_id=chat_id,
+            text="❌ Только администраторы могут использовать эту команду."
+        )
+        return
+    
+    # Переключаем режим
+    current_state = user_states.get(user_id, STATE_NORMAL)
+    new_state = STATE_TEST_MODE if current_state != STATE_TEST_MODE else STATE_NORMAL
+    user_states[user_id] = new_state
+    
+    # Отправляем сообщение о текущем статусе
+    status_message = "✅ Тестовый режим включен" if new_state == STATE_TEST_MODE else "❌ Тестовый режим выключен"
+    await context.bot.send_message(chat_id=chat_id, text=status_message)
+    
+    logger.info(f"Администратор {user_id} {'включен' if new_state == STATE_TEST_MODE else 'выключен'} тестовый режим")
 
 async def set_format(update: Update, context: CallbackContext) -> None:
+    """Устанавливает формат по умолчанию."""
+    user_id = update.effective_user.id
+    chat_id = update.effective_chat.id
+    
+    # Проверка на право использования команды
+    if not check_admin(user_id):
+        await context.bot.send_message(
+            chat_id=chat_id,
+            text="❌ Только администраторы могут использовать эту команду."
+        )
+        return
+    
+    # Проверяем, что формат указан
+    if not context.args or len(context.args) < 1:
+        await context.bot.send_message(
+            chat_id=chat_id,
+            text="❌ Укажите формат: /setformat [markdown|html|modern]"
+        )
+        return
+    
+    # Получаем формат из аргументов
+    format_type = context.args[0].lower()
+    
+    # Проверяем, что формат корректный
+    valid_formats = ["markdown", "html", "modern"]
+    if format_type not in valid_formats:
+        await context.bot.send_message(
+            chat_id=chat_id,
+            text=f"❌ Неверный формат. Используйте один из следующих: {', '.join(valid_formats)}"
+        )
+        return
+    
+    # Устанавливаем формат по умолчанию
+    context.bot_data["default_format"] = format_type
+    
+    # Отправляем сообщение о текущем статусе
+    await context.bot.send_message(
+        chat_id=chat_id,
+        text=f"✅ Формат по умолчанию установлен: {format_type}"
+    )
+    
+    logger.info(f"Администратор {user_id} установил формат по умолчанию: {format_type}")
+
+async def button_handler(update: Update, context: CallbackContext) -> None:
+    """Обрабатывает нажатия на кнопки."""
+    query = update.callback_query
+    user_id = query.from_user.id
+    
+    # Обязательно отвечаем на запрос
+    await query.answer()
+    
+    # Получаем данные из callback_data
+    callback_data = query.data
+    
+    # Обрабатываем выбор формата
+    if callback_data.startswith("format_"):
+        format_type = callback_data.replace("format_", "")
+        
+        # Сохраняем выбранный формат
+        context.user_data["format"] = format_type
+        
+        # Обновляем текст сообщения
+        await query.edit_message_text(
+            text=f"✅ Формат установлен: {format_type}\n\nТеперь отправьте сообщение для форматирования."
+        )
+        
+        # Обновляем состояние пользователя
+        user_states[user_id] = STATE_AWAITING_MESSAGE
+        
+        logger.info(f"Пользователь {user_id} выбрал формат: {format_type}")
+
+async def handle_message(update: Update, context: CallbackContext) -> None:
+    """Обрабатывает обычные текстовые сообщения."""
+    message = update.message
+    user_id = message.from_user.id
+    chat_id = message.chat_id
+    
+    # Получаем текст и формат сообщения
+    text = message.text
+    
+    # Проверяем, находится ли пользователь в состоянии ожидания сообщения
+    state = user_states.get(user_id, STATE_NORMAL)
+    
+    # Если пользователь не в состоянии ожидания формата или сообщения, устанавливаем формат по умолчанию
+    if state != STATE_AWAITING_FORMAT and state != STATE_AWAITING_MESSAGE:
+        format_type = context.user_data.get("format", context.bot_data.get("default_format", config.DEFAULT_FORMAT)).lower()
+    else:
+        format_type = context.user_data.get("format", "markdown").lower()
+    
+    logger.info(f"Получено сообщение: {text}")
+    logger.info(f"Формат сообщения: {format_type}")
+    
+    try:
+        # Форматируем текст в зависимости от выбранного формата
+        if format_type == "html":
+            # Для HTML формата используем текст как есть
+            formatted_text = text
+        elif format_type == "modern":
+            formatted_text = modern_to_html(text)
+        else:  # По умолчанию используем Markdown
+            formatted_text = markdown_to_html(text)
+        
+        logger.info(f"Отформатированное сообщение: {formatted_text}")
+        
+        # Определяем режим парсинга
+        parse_mode = ParseMode.HTML
+        logger.info(f"Режим парсинга: {parse_mode}")
+        
+        # Создаем подпись
+        footer = create_footer()
+        
+        # Проверяем, находится ли пользователь в тестовом режиме
+        test_mode_enabled = state == STATE_TEST_MODE
+        
+        # В зависимости от режима отправляем сообщение в канал или только пользователю
+        if test_mode_enabled or chat_id == user_id:  # Если включен тестовый режим или это личная переписка
+            # Отправляем сообщение пользователю с форматированием
+            await context.bot.send_message(
+                chat_id=chat_id,
+                text=formatted_text,
+                parse_mode=parse_mode,
+                disable_web_page_preview=False
+            )
+        else:
+            # В обычном режиме для группового чата или канала
+            # Отправляем сообщение в канал
+            if config.CHANNEL_ID:
+                try:
+                    # Если доступен тестовый чат и включен тестовый режим, отправляем туда
+                    if test_mode_enabled and config.TEST_CHAT_ID:
+                        target_chat_id = config.TEST_CHAT_ID
+                    else:
+                        target_chat_id = config.CHANNEL_ID
+                    
+                    # Добавляем подпись, если она доступна
+                    if footer:
+                        formatted_text += footer
+                    
+                    await context.bot.send_message(
+                        chat_id=target_chat_id,
+                        text=formatted_text,
+                        parse_mode=parse_mode,
+                        disable_web_page_preview=False
+                    )
+                    
+                    await context.bot.send_message(
+                        chat_id=chat_id,
+                        text="✅ Сообщение успешно отправлено в канал."
+                    )
+                except Exception as e:
+                    logger.error(f"Ошибка при отправке сообщения в канал: {str(e)}", exc_info=True)
+                    await context.bot.send_message(
+                        chat_id=chat_id,
+                        text=f"❌ Ошибка при отправке сообщения в канал: {str(e)}"
+                    )
+            else:
+                # Если канал не настроен, просто отвечаем пользователю
+                await context.bot.send_message(
+                    chat_id=chat_id,
+                    text="⚠️ ID канала не настроен. Отправьте сообщение администратору."
+                )
+    except Exception as e:
+        logger.error(f"Ошибка при обработке сообщения: {str(e)}", exc_info=True)
+        await context.bot.send_message(
+            chat_id=chat_id,
+            text=f"❌ Ошибка форматирования: {str(e)}\n\nПопробуйте другой формат или исправьте ошибки в разметке.\n\n🔍 Текст с ошибкой (для отладки):\n\n{text}"
+        )
+        
+async def send_to_channel(update: Update, context: CallbackContext) -> None:
     """
-    Устанавливает формат по умолчанию (команда только для администраторов).
-    Использование: /setformat markdown|html|modern
+    Отправляет форматированное сообщение в канал.
+    В зависимости от режима работы бота, сообщение отправляется:
+    - В тестовом режиме: в TEST_CHAT_ID или себе, если TEST_CHAT_ID не указан
+    - В обычном режиме: в CHANNEL_ID
+    
+    Использование: /send текст сообщения
     """
     user_id = update.effective_user.id
     chat_id = update.effective_chat.id
     
-    # Проверяем, является ли пользователь администратором
+    # Проверяем права администратора
     if not check_admin(user_id):
         await context.bot.send_message(
             chat_id=chat_id,
-            text="❌ У вас нет прав для использования этой команды."
+            text="❌ У вас нет прав для отправки сообщений в канал."
         )
         return
     
@@ -195,209 +392,216 @@ async def set_format(update: Update, context: CallbackContext) -> None:
     if not context.args or len(context.args) < 1:
         await context.bot.send_message(
             chat_id=chat_id,
-            text="❌ Укажите формат: /setformat markdown|html|modern"
+            text="❌ Укажите текст сообщения: /send текст сообщения"
         )
         return
     
-    # Получаем формат из аргумента
-    format_type = context.args[0].lower()
+    # Собираем текст сообщения из всех аргументов
+    message_text = ' '.join(context.args)
     
-    # Проверяем, правильный ли формат
-    if format_type not in ["markdown", "html", "modern"]:
+    # Определяем, включен ли тестовый режим
+    test_mode_enabled = user_states.get(user_id) == STATE_TEST_MODE
+    
+    # Определяем, куда отправлять сообщение
+    if test_mode_enabled:
+        # В тестовом режиме: в TEST_CHAT_ID или себе
+        if config.TEST_CHAT_ID != 0:
+            target_chat_id = config.TEST_CHAT_ID
+            target_name = "тестовый канал"
+        else:
+            target_chat_id = chat_id  # Отправляем сами себе
+            target_name = "текущий чат (тестовый режим)"
+    else:
+        # В обычном режиме: в основной канал
+        if config.CHANNEL_ID != 0:
+            target_chat_id = config.CHANNEL_ID
+            target_name = "основной канал"
+        else:
+            await context.bot.send_message(
+                chat_id=chat_id,
+                text="❌ ID основного канала не установлен в конфигурации."
+            )
+            return
+    
+    # Определяем формат сообщения (используем сохраненный пользователем или формат по умолчанию)
+    format_type = context.user_data.get("format", context.bot_data.get("default_format", config.DEFAULT_FORMAT)).lower()
+    logger.info(f"Формат сообщения для канала: {format_type}")
+    
+    # Форматируем текст в зависимости от выбранного формата
+    if format_type == "html":
+        # Для HTML формата используем текст как есть
+        formatted_text = message_text
+    elif format_type == "modern":
+        formatted_text = modern_to_html(message_text)
+    else:  # По умолчанию используем Markdown
+        formatted_text = markdown_to_html(message_text)
+    
+    logger.info(f"Отформатированное сообщение для канала: {formatted_text}")
+    
+    # Добавляем подпись, если она доступна
+    footer = create_footer()
+    if footer:
+        formatted_text += footer
+    
+    # Определяем режим парсинга
+    parse_mode = ParseMode.HTML if format_type in ["html", "markdown", "modern"] else None
+    
+    # В тестовом режиме можем показать дополнительную информацию
+    if test_mode_enabled:
+        # Показываем отформатированный текст до отправки
+        safe_preview = formatted_text.replace("<", "&lt;").replace(">", "&gt;")
+        preview_message = f"📝 Предпросмотр сообщения:\n\n{safe_preview[:500]}"
+        if len(safe_preview) > 500:
+            preview_message += "..."
+        
         await context.bot.send_message(
             chat_id=chat_id,
-            text="❌ Неверный формат. Доступные варианты: markdown, html, modern"
+            text=preview_message,
+            parse_mode=None  # Без форматирования для безопасного просмотра
         )
-        return
     
-    # Устанавливаем формат по умолчанию
-    context.bot_data["default_format"] = format_type
-    
-    await context.bot.send_message(
-        chat_id=chat_id,
-        text=f"✅ Формат по умолчанию установлен: {format_type}"
-    )
-    logger.info(f"Администратор {user_id} установил формат по умолчанию: {format_type}")
+    # Отправляем сообщение в целевой чат
+    try:
+        message = await context.bot.send_message(
+            chat_id=target_chat_id,
+            text=formatted_text,
+            parse_mode=parse_mode,
+            disable_web_page_preview=False
+        )
+        
+        # Сообщаем об успешной отправке
+        success_message = f"✅ Сообщение успешно отправлено в {target_name}."
+        if test_mode_enabled:
+            success_message += f"\nID сообщения: {message.message_id}"
+        
+        await context.bot.send_message(
+            chat_id=chat_id,
+            text=success_message
+        )
+        logger.info(f"Сообщение успешно отправлено в {target_name} (ID: {target_chat_id}). ID сообщения: {message.message_id}")
+    except Exception as e:
+        error_message = str(e)
+        logger.error(f"Ошибка при отправке сообщения в {target_name} (ID: {target_chat_id}): {error_message}", exc_info=True)
+        
+        # Отправляем информацию об ошибке
+        await context.bot.send_message(
+            chat_id=chat_id,
+            text=f"❌ Ошибка при отправке сообщения в {target_name}: {error_message}"
+        )
+        
+        # В тестовом режиме показываем детали ошибки
+        if test_mode_enabled:
+            # Показываем детали для отладки
+            safe_text = formatted_text.replace("<", "&lt;").replace(">", "&gt;")
+            debug_info = f"🔍 Детали ошибки:\n\n" \
+                        f"Целевой чат: {target_name} (ID: {target_chat_id})\n" \
+                        f"Формат: {format_type}\n" \
+                        f"Режим парсинга: {parse_mode}\n" \
+                        f"Текст с ошибкой (часть): {safe_text[:300]}..."
+            await context.bot.send_message(
+                chat_id=chat_id,
+                text=debug_info
+            )
 
-
-async def test_mode(update: Update, context: CallbackContext) -> None:
+async def check_channels(update: Update, context: CallbackContext) -> None:
     """
-    Включает/выключает тестовый режим (команда только для администраторов).
-    В тестовом режиме бот показывает промежуточные результаты форматирования.
+    Проверяет права бота в настроенных каналах и выводит информацию о них.
     """
     user_id = update.effective_user.id
     chat_id = update.effective_chat.id
     
-    # Проверяем, является ли пользователь администратором
+    # Проверяем права администратора
     if not check_admin(user_id):
         await context.bot.send_message(
             chat_id=chat_id,
-            text="❌ У вас нет прав для использования этой команды."
+            text="❌ У вас нет прав для выполнения этой команды."
         )
         return
     
-    # Проверяем текущее состояние тестового режима
-    test_mode_enabled = context.bot_data.get("test_mode", False)
+    # Собираем список каналов из конфигурации
+    channels = []
     
-    # Меняем состояние на противоположное
-    context.bot_data["test_mode"] = not test_mode_enabled
+    if hasattr(config, 'CHANNEL_ID') and config.CHANNEL_ID != 0:
+        channels.append(("Основной канал", config.CHANNEL_ID))
     
-    status = "включен" if not test_mode_enabled else "выключен"
+    if hasattr(config, 'TEST_CHAT_ID') and config.TEST_CHAT_ID != 0:
+        channels.append(("Тестовый канал", config.TEST_CHAT_ID))
     
-    # Устанавливаем тестовый режим для пользователя
-    if not test_mode_enabled:
-        user_states[user_id] = STATE_TEST_MODE
-    else:
-        user_states[user_id] = STATE_NORMAL
+    if not channels:
+        await context.bot.send_message(
+            chat_id=chat_id,
+            text="❌ В конфигурации не найдены ID каналов."
+        )
+        return
     
+    # Проверяем доступ к каналам
+    result = "📊 Информация о каналах:\n\n"
+    
+    for name, channel_id in channels:
+        try:
+            # Пробуем получить информацию о чате
+            chat_info = await context.bot.get_chat(channel_id)
+            
+            # Проверяем права бота в канале
+            bot_member = await context.bot.get_chat_member(
+                chat_id=channel_id,
+                user_id=context.bot.id
+            )
+            
+            # Формируем строку статуса
+            status = "✅ Доступен"
+            if hasattr(bot_member, 'can_post_messages') and not bot_member.can_post_messages:
+                status = "⚠️ Нет прав на отправку сообщений"
+            
+            # Добавляем информацию о канале
+            result += f"{name} ({channel_id}):\n"
+            result += f"Название: {chat_info.title}\n"
+            result += f"Тип: {chat_info.type}\n"
+            result += f"Статус: {status}\n\n"
+            
+        except Exception as e:
+            result += f"{name} ({channel_id}):\n"
+            result += f"Статус: ❌ Ошибка доступа ({str(e)})\n\n"
+    
+    # Отправляем результат проверки
     await context.bot.send_message(
         chat_id=chat_id,
-        text=f"✅ Тестовый режим {status}."
+        text=result
     )
-    logger.info(f"Администратор {user_id} {status} тестовый режим")
-
-
-async def button_handler(update: Update, context: CallbackContext) -> None:
-    """Обрабатывает нажатия на кнопки."""
-    query = update.callback_query
-    chat_id = query.message.chat_id
-    
-    # Отвечаем на запрос, чтобы убрать часы загрузки
-    await query.answer()
-    
-    # Получаем данные из callback_data
-    callback_data = query.data
-    
-    # Обработка выбора формата
-    if callback_data.startswith("format_"):
-        format_type = callback_data.replace("format_", "")
-        
-        # Сохраняем выбранный формат в пользовательских данных
-        context.user_data["format"] = format_type
-        
-        # Обновляем сообщение с кнопками
-        await query.edit_message_text(
-            text=f"Выбранный формат: {format_type.upper()}\n\n"
-                 f"Отправьте мне текст для форматирования."
-        )
-        
-        # Устанавливаем состояние ожидания сообщения
-        user_states[chat_id] = STATE_AWAITING_MESSAGE
-
-
-async def handle_message(update: Update, context: CallbackContext) -> None:
-    """Обрабатывает входящие сообщения."""
-    try:
-        chat_id = update.effective_chat.id
-        user_id = update.effective_user.id
-        message = update.message
-        
-        if message and message.text:
-            # Восстанавливаем исходный текст с маркерами форматирования
-            raw_text = message.text
-            entities = message.entities or []
-            
-            if entities:
-                # Если есть форматирование, восстанавливаем маркеры форматирования
-                try:
-                    raw_text = recreate_markdown_from_entities(raw_text, entities)
-                except Exception as e:
-                    logger.error(f"Ошибка при восстановлении маркеров форматирования: {str(e)}", exc_info=True)
-            
-            logger.info(f"Получено сообщение: {raw_text}")
-            
-            # Определяем формат сообщения (используем сохраненный пользователем или формат по умолчанию)
-            format_type = context.user_data.get("format", context.bot_data.get("default_format", "markdown")).lower()
-            logger.info(f"Формат сообщения: {format_type}")
-            
-            # Если активен тестовый режим и пользователь администратор, показываем исходный текст
-            test_mode_enabled = context.bot_data.get("test_mode", False)
-            is_in_test_mode = user_states.get(user_id) == STATE_TEST_MODE
-            
-            if test_mode_enabled and check_admin(user_id) and is_in_test_mode:
-                await context.bot.send_message(
-                    chat_id=chat_id,
-                    text=f"📋 Исходный текст с маркерами:\n\n{raw_text}"
-                )
-            
-            # Форматируем текст в зависимости от выбранного формата
-            if format_type == "html":
-                # Для HTML формата используем текст как есть
-                formatted_text = raw_text
-            elif format_type == "modern":
-                formatted_text = modern_to_html(raw_text)
-            else:  # По умолчанию используем Markdown
-                formatted_text = markdown_to_html(raw_text)
-            
-            logger.info(f"Отформатированное сообщение: {formatted_text}")
-            
-            # В тестовом режиме показываем отформатированный HTML до добавления подписи
-            if test_mode_enabled and check_admin(user_id) and is_in_test_mode:
-                await context.bot.send_message(
-                    chat_id=chat_id,
-                    text=f"🔄 Отформатированный текст (HTML):\n\n{formatted_text}"
-                )
-            
-            # Добавляем подпись, если она доступна
-            footer = create_footer()
-            if footer:
-                formatted_text += footer
-            
-            # Определяем режим парсинга
-            parse_mode = ParseMode.HTML if format_type in ["html", "markdown", "modern"] else None
-            logger.info(f"Режим парсинга: {parse_mode}")
-            
-            # Отправляем отформатированный текст
-            try:
-                sent_message = await context.bot.send_message(
-                    chat_id=chat_id,
-                    text=formatted_text,
-                    parse_mode=parse_mode
-                )
-                logger.info(f"Сообщение успешно отправлено с ID: {sent_message.message_id}")
-            except BadRequest as e:
-                logger.error(f"Ошибка при отправке сообщения: {str(e)}", exc_info=True)
-                # Если не удалось отправить с HTML-форматированием, пробуем без него
-                if "can't parse entities" in str(e).lower():
-                    await context.bot.send_message(
-                        chat_id=chat_id,
-                        text=f"❌ Ошибка форматирования: {str(e)}\n\nПопробуйте другой формат или исправьте ошибки в разметке."
-                    )
-                    
-                    # В тестовом режиме отправляем содержимое с ошибкой для отладки
-                    if test_mode_enabled and check_admin(user_id) and is_in_test_mode:
-                        # Экранируем HTML для безопасного отображения
-                        safe_text = formatted_text.replace("<", "&lt;").replace(">", "&gt;")
-                        await context.bot.send_message(
-                            chat_id=chat_id,
-                            text=f"🔍 Текст с ошибкой (для отладки):\n\n{safe_text}",
-                            parse_mode=ParseMode.HTML
-                        )
-    except Exception as e:
-        logger.error(f"Ошибка при обработке сообщения: {str(e)}", exc_info=True)
-        try:
-            await context.bot.send_message(
-                chat_id=chat_id,
-                text=f"❌ Произошла ошибка при обработке сообщения: {str(e)}"
-            )
-        except:
-            logger.error("Не удалось отправить сообщение об ошибке", exc_info=True)
-
 
 async def error_handler(update: Update, context: CallbackContext) -> None:
     """Обрабатывает ошибки."""
-    logger.error(msg="Произошла ошибка:", exc_info=context.error)
+    error = context.error
+    logger.error(msg=f"Произошла ошибка: {error}", exc_info=error)
     
     try:
         if update and update.effective_chat:
             chat_id = update.effective_chat.id
+            
+            # Формируем сообщение об ошибке
+            error_message = "Извините, произошла ошибка при обработке вашего запроса."
+            
+            # Проверяем тип ошибки
+            if isinstance(error, BadRequest):
+                error_message = f"Ошибка запроса: {str(error)}"
+            
+            # Для админов показываем более подробную информацию
+            user_id = update.effective_user.id if update.effective_user else None
+            if user_id and check_admin(user_id):
+                error_message += f"\n\nДетали ошибки: {str(error)}"
+                
+                # Добавляем информацию о контексте
+                if hasattr(context, 'chat_data') and context.chat_data:
+                    error_message += f"\n\nДанные чата: {str(context.chat_data)}"
+                if hasattr(context, 'user_data') and context.user_data:
+                    error_message += f"\n\nДанные пользователя: {str(context.user_data)}"
+            
             await context.bot.send_message(
                 chat_id=chat_id,
-                text="Извините, произошла ошибка при обработке вашего запроса."
+                text=error_message
             )
-    except:
-        logger.error("Не удалось отправить сообщение об ошибке", exc_info=True)
-
+    except Exception as e:
+        logger.error(f"Не удалось отправить сообщение об ошибке: {e}", exc_info=True)
 
 def setup_handlers(application: Application) -> None:
     """
@@ -414,6 +618,8 @@ def setup_handlers(application: Application) -> None:
     # Регистрируем обработчики команд для администраторов
     application.add_handler(CommandHandler("test", test_mode))
     application.add_handler(CommandHandler("setformat", set_format))
+    application.add_handler(CommandHandler("send", send_to_channel))  # Команда для отправки в канал
+    application.add_handler(CommandHandler("channels", check_channels))  # Команда для проверки каналов
     
     # Регистрируем обработчик для кнопок
     application.add_handler(CallbackQueryHandler(button_handler))
