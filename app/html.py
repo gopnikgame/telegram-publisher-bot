@@ -6,7 +6,9 @@ from .markdown import (
     process_emoji, process_headers, process_quotes, 
     extract_and_save_placeholders, restore_placeholders,
     process_bold_text, process_italic_text, process_strikethrough_text,
-    process_underline_text, process_bold_italic_text, process_links, process_code
+    process_underline_text, process_bold_italic_text, process_links, process_code,
+    # Добавляем импорт перенесенных функций
+    process_simple_horizontal_rules, format_simple_tables, format_simple_lists
 )
 
 logger = logging.getLogger(__name__)  # Получаем логгер
@@ -17,106 +19,51 @@ def is_html_formatted(text: str) -> bool:
     html_tags_pattern = re.compile(r'<(/?)(b|strong|i|em|u|s|strike|del|code|pre|a)(\s+[^>]*)?>')
     return bool(html_tags_pattern.search(text))
 
-# Функция для простого форматирования списков в тексте
-def format_simple_lists(text: str) -> str:
+# Функция для восстановления маркеров Markdown из объекта entities
+def recreate_markdown_from_entities(text: str, entities: list) -> str:
     """
-    Преобразует списки в простой текстовый формат, поддерживаемый Telegram.
+    Восстанавливает маркеры Markdown из объекта entities.
     """
-    lines = text.split('\n')
-    result = []
-    
-    for i, line in enumerate(lines):
-        # Нумерованный список: заменяем на простой текст с номером
-        ordered_match = re.match(r'^\s*(\d+)[.)]\s+(.*)', line)
-        if ordered_match:
-            number = ordered_match.group(1)
-            content = ordered_match.group(2)
-            result.append(f"{number}. {content}")
-            continue
-            
-        # Маркированный список: заменяем на простой текст с тире или точкой
-        unordered_match = re.match(r'^\s*[-*+]\s+(.*)', line)
-        if unordered_match:
-            content = unordered_match.group(1)
-            result.append(f"• {content}")
-            continue
-            
-        result.append(line)
-    
-    return '\n'.join(result)
-
-# Функция для простого форматирования горизонтальных линий
-def process_simple_horizontal_rules(text: str) -> str:
-    """Заменяет горизонтальные линии на простые текстовые разделители."""
-    text = re.sub(r'^---+$', '----------', text, flags=re.MULTILINE)
-    text = re.sub(r'^\*\*\*+$', '----------', text, flags=re.MULTILINE)
-    text = re.sub(r'^___+$', '----------', text, flags=re.MULTILINE)
-    return text
-
-# Функция для простого форматирования таблиц в тексте
-def format_simple_tables(text: str) -> str:
-    """
-    Преобразует markdown таблицы в простой текстовый формат.
-    """
-    lines = text.split('\n')
-    result = []
-    in_table = False
-    table_data = []
-    
-    for i, line in enumerate(lines):
-        # Проверяем, является ли строка частью таблицы
-        if re.match(r'^\s*\|.*\|\s*$', line):
-            in_table = True
-            # Извлекаем ячейки, удаляя начальный и конечный разделитель
-            cells = [cell.strip() for cell in line.strip('| \t').split('|')]
-            table_data.append(cells)
-        elif in_table:
-            # Если это разделитель заголовка таблицы, пропускаем его
-            if re.match(r'^\s*\|([-:]+\|)+\s*$', line):
-                continue
-            
-            # Вышли из таблицы, форматируем собранные данные
-            if table_data:
-                result.append(format_table_as_text(table_data))
-                table_data = []
-            in_table = False
-            result.append(line)
-        else:
-            result.append(line)
-    
-    # Обработка таблицы в конце текста
-    if in_table and table_data:
-        result.append(format_table_as_text(table_data))
-    
-    return '\n'.join(result)
-
-def format_table_as_text(table_data):
-    """
-    Форматирует данные таблицы в виде простого текста без тегов HTML.
-    """
-    if not table_data:
-        return ""
-    
-    # Находим максимальную ширину для каждого столбца
-    col_widths = [0] * len(table_data[0])
-    for row in table_data:
-        for i, cell in enumerate(row):
-            if i < len(col_widths):
-                col_widths[i] = max(col_widths[i], len(cell))
-    
-    # Форматируем каждую строку таблицы
-    formatted_rows = []
-    for i, row in enumerate(table_data):
-        formatted_cells = [cell.ljust(col_widths[j]) for j, cell in enumerate(row) if j < len(col_widths)]
-        formatted_row = " | ".join(formatted_cells)
-        formatted_rows.append(formatted_row)
+    if not entities:
+        return text
         
-        # Добавляем разделитель после заголовка в виде текстовой строки (не HTML)
-        if i == 0:
-            separator = "-" * len(formatted_row)
-            formatted_rows.append(separator)
+    # Сортируем сущности в обратном порядке, чтобы начать с конца текста
+    # Это позволяет не менять индексы при вставке
+    sorted_entities = sorted(entities, key=lambda e: e.offset, reverse=True)
     
-    return '\n'.join(formatted_rows)
+    # Создаем копию текста для модификации
+    result = text
+    
+    for entity in sorted_entities:
+        start = entity.offset
+        end = entity.offset + entity.length
+        
+        # Получаем текст внутри сущности
+        entity_text = text[start:end]
+        
+        # В зависимости от типа сущности добавляем соответствующие маркеры
+        if entity.type == "bold":
+            formatted_text = f"**{entity_text}**"
+        elif entity.type == "italic":
+            formatted_text = f"*{entity_text}*"
+        elif entity.type == "code":
+            formatted_text = f"`{entity_text}`"
+        elif entity.type == "pre":
+            formatted_text = f"```\n{entity_text}\n```"
+        elif entity.type == "text_link":
+            formatted_text = f"[{entity_text}]({entity.url})"
+        elif entity.type == "strikethrough":
+            formatted_text = f"~~{entity_text}~~"
+        elif entity.type == "underline":
+            formatted_text = f"__${entity_text}$__"
+        # Добавляем другие типы при необходимости
+        else:
+            continue  # Если не можем обработать, пропускаем
+        
+        # Заменяем часть текста на текст с маркерами
+        result = result[:start] + formatted_text + result[end:]
+    
+    return result
 
 def format_html(text: str) -> str:
     """Форматирует текст в HTML, поддерживаемый Telegram API."""
