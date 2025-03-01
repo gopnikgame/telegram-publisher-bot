@@ -57,13 +57,14 @@ def create_footer() -> str:
     """Создает подпись для сообщений."""
     footer_parts = []
     
-    if config.PUBLIC_CHANNEL_LINK:
+    # Безопасно проверяем наличие атрибутов в объекте config
+    if hasattr(config, 'PUBLIC_CHANNEL_LINK') and config.PUBLIC_CHANNEL_LINK:
         footer_parts.append(f'<a href="{config.PUBLIC_CHANNEL_LINK}">PUBLIC</a>')
     
-    if config.BOT_LINK:
+    if hasattr(config, 'BOT_LINK') and config.BOT_LINK:
         footer_parts.append(f'<a href="{config.BOT_LINK}">Bot_VPNLine</a>')
     
-    if config.SUPPORT_LINK:
+    if hasattr(config, 'SUPPORT_LINK') and config.SUPPORT_LINK:
         footer_parts.append(f'<a href="{config.SUPPORT_LINK}">SUPPORT</a>')
     
     if footer_parts:
