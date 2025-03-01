@@ -7,6 +7,7 @@ set -euo pipefail
 REPO_URL="https://github.com/gopnikgame/telegram-publisher-bot.git"
 PROJECT_DIR="telegram-publisher-bot"
 INSTALL_DIR="/opt/$PROJECT_DIR" # Постоянная директория для установки
+LOG_FILE="/var/log/telegram-publisher-bot.log"
 
 # Цвета для вывода
 RED='\033[0;31m'
@@ -19,7 +20,7 @@ NC='\033[0m' # No Color
 log() {
     local level=$1
     local message=$2
-    echo -e "${!level}${message}${NC}"
+    echo -e "${!level}${message}${NC}" | tee -a "$LOG_FILE"
 }
 
 # Проверка зависимостей
