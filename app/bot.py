@@ -27,7 +27,17 @@ STATE_NORMAL = 'normal'
 STATE_TEST_MODE = 'test_mode'
 
 # Список администраторов (ID пользователей)
-ADMIN_IDS = [int(admin_id) for admin_id in config.ADMIN_IDS.split(',') if admin_id.strip()] if config.ADMIN_IDS else []
+# Проверяем тип данных и обрабатываем соответственно
+if isinstance(config.ADMIN_IDS, str):
+    # Если это строка, разбиваем по запятой
+    ADMIN_IDS = [int(admin_id) for admin_id in config.ADMIN_IDS.split(',') if admin_id.strip()]
+elif isinstance(config.ADMIN_IDS, list):
+    # Если уже список, просто конвертируем элементы в int
+    ADMIN_IDS = [int(admin_id) if isinstance(admin_id, str) else admin_id for admin_id in config.ADMIN_IDS]
+else:
+    # По умолчанию - пустой список
+    ADMIN_IDS = []
+
 logger.info(f"Загружены ID администраторов: {ADMIN_IDS}")
 
 def check_admin(user_id: int) -> bool:
