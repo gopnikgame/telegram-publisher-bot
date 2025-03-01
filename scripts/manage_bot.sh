@@ -235,7 +235,7 @@ CURRENT_USER=$(whoami)
 # Основное меню
 main_menu() {
     while true; do
-        log "MAGENTA" "🤖 Telegram Publisher Bot"
+        log "YELLOW" "🤖 Telegram Publisher Bot"
         log "YELLOW" "========================"
         log "GREEN" "1. ⬆️ Обновить из репозитория"
         log "GREEN" "2. 📝 Создать или редактировать .env файл"
