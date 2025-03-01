@@ -10,11 +10,13 @@ from .markdown import (
 
 logger = logging.getLogger(__name__)  # Получаем логгер
 
-def is_html_formatted(text: str) -> bool: """Проверяет, содержит ли текст HTML-теги."""
+def is_html_formatted(text: str) -> bool:
+    """Проверяет, содержит ли текст HTML-теги."""
     html_tags_pattern = re.compile(r'<(/?)(b|strong|i|em|u|s|strike|del|code|pre|a|br|p|ul|ol|li|blockquote)(\s+[^>]*)?>')
     return bool(html_tags_pattern.search(text))
 
-def format_html(text: str) -> str: """Форматирует текст в HTML."""
+def format_html(text: str) -> str:
+    """Форматирует текст в HTML."""
     if is_html_formatted(text):
         logger.info("Обнаружена HTML-разметка, пропускаем экранирование")  # Если текст уже содержит HTML-теги, не экранируем его
     else:
@@ -40,7 +42,8 @@ def format_html(text: str) -> str: """Форматирует текст в HTML.
         text = process_horizontal_rules(text)
     return text
 
-def markdown_to_html(text: str) -> str: """Преобразует текст в формате Markdown в HTML, поддерживаемый Telegram."""
+def markdown_to_html(text: str) -> str:
+    """Преобразует текст в формате Markdown в HTML, поддерживаемый Telegram."""
     try:
         if not text:
             return ""
@@ -86,7 +89,8 @@ def markdown_to_html(text: str) -> str: """Преобразует текст в 
         logger.error(f"Ошибка преобразования Markdown в HTML для Telegram: {e}", exc_info=True)
         return text
 
-def modern_to_html(text: str) -> str: """Преобразует текст в формате Modern в HTML, поддерживаемый Telegram."""
+def modern_to_html(text: str) -> str:
+    """Преобразует текст в формате Modern в HTML, поддерживаемый Telegram."""
     try:
         logger.info("Начало конвертации Modern в HTML")
         logger.info(f"Исходный текст Modern: {text[:100]}...")
