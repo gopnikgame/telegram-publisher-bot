@@ -7,7 +7,7 @@ from .markdown import (
     extract_and_save_placeholders, restore_placeholders,
     process_bold_text, process_italic_text, process_strikethrough_text,
     process_underline_text, process_bold_italic_text, process_links, process_code,
-    # Добавляем импорт перенесенных функций
+    # Импорты перенесенных функций
     process_simple_horizontal_rules, format_simple_tables, format_simple_lists
 )
 
