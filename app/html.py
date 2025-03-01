@@ -3,7 +3,7 @@ import html  # Для экранирования HTML
 import re
 
 from .markdown import (
-    process_emoji, process_headers, process_quotes, process_horizontal_rules,
+    process_emoji, process_headers, process_quotes, 
     extract_and_save_placeholders, restore_placeholders,
     process_bold_text, process_italic_text, process_strikethrough_text,
     process_underline_text, process_bold_italic_text, process_links, process_code
@@ -12,8 +12,9 @@ from .markdown import (
 logger = logging.getLogger(__name__)  # Получаем логгер
 
 def is_html_formatted(text: str) -> bool:
-    """Проверяет, содержит ли текст HTML-теги."""
-    html_tags_pattern = re.compile(r'<(/?)(strong|b|i|em|u|del|s|strike|code|pre|a|br|p)(\s+[^>]*)?>')
+    """Проверяет, содержит ли текст HTML-теги, поддерживаемые Telegram API."""
+    # Обновленный список тегов в соответствии с документацией Telegram API
+    html_tags_pattern = re.compile(r'<(/?)(b|strong|i|em|u|s|strike|del|code|pre|a)(\s+[^>]*)?>')
     return bool(html_tags_pattern.search(text))
 
 # Функция для простого форматирования списков в тексте
@@ -43,6 +44,14 @@ def format_simple_lists(text: str) -> str:
         result.append(line)
     
     return '\n'.join(result)
+
+# Функция для простого форматирования горизонтальных линий
+def process_simple_horizontal_rules(text: str) -> str:
+    """Заменяет горизонтальные линии на простые текстовые разделители."""
+    text = re.sub(r'^---+$', '----------', text, flags=re.MULTILINE)
+    text = re.sub(r'^\*\*\*+$', '----------', text, flags=re.MULTILINE)
+    text = re.sub(r'^___+$', '----------', text, flags=re.MULTILINE)
+    return text
 
 # Функция для простого форматирования таблиц в тексте
 def format_simple_tables(text: str) -> str:
@@ -83,7 +92,7 @@ def format_simple_tables(text: str) -> str:
 
 def format_table_as_text(table_data):
     """
-    Форматирует данные таблицы в виде простого текста.
+    Форматирует данные таблицы в виде простого текста без тегов HTML.
     """
     if not table_data:
         return ""
@@ -102,7 +111,7 @@ def format_table_as_text(table_data):
         formatted_row = " | ".join(formatted_cells)
         formatted_rows.append(formatted_row)
         
-        # Добавляем разделитель после заголовка
+        # Добавляем разделитель после заголовка в виде текстовой строки (не HTML)
         if i == 0:
             separator = "-" * len(formatted_row)
             formatted_rows.append(separator)
@@ -110,7 +119,7 @@ def format_table_as_text(table_data):
     return '\n'.join(formatted_rows)
 
 def format_html(text: str) -> str:
-    """Форматирует текст в HTML."""
+    """Форматирует текст в HTML, поддерживаемый Telegram API."""
     if is_html_formatted(text):
         logger.info("Обнаружена HTML-разметка, пропускаем экранирование")
     else:
@@ -121,6 +130,7 @@ def format_html(text: str) -> str:
         # Сначала преобразуем списки и таблицы в простой текст
         text = format_simple_lists(text)
         text = format_simple_tables(text)
+        text = process_simple_horizontal_rules(text)
         
         # Применяем форматирование, поддерживаемое Telegram
         text = process_emoji(text)
@@ -157,12 +167,12 @@ def markdown_to_html(text: str) -> str:
         # Обработка списков и таблиц в простой текстовый формат
         text = format_simple_lists(text)
         text = format_simple_tables(text)
+        text = process_simple_horizontal_rules(text)
         
         # Шаг 4-9: Базовая обработка Markdown
         text = process_emoji(text)
         text = process_headers(text)
         text = process_quotes(text)
-        text = process_horizontal_rules(text)
         
         # Шаг 10: Базовое форматирование текста
         logger.info(f"Текст перед обработкой форматирования: {text[:100]}...")
@@ -187,7 +197,8 @@ def markdown_to_html(text: str) -> str:
             if match:
                 language = match.group(1).strip()
                 code_content = match.group(2)
-                html_code_block = f'<pre><code>{html.escape(code_content)}</code></pre>'
+                # Используем <pre> без вложенного <code> для лучшей совместимости
+                html_code_block = f'<pre>{html.escape(code_content)}</pre>'
                 text = text.replace(placeholder, html_code_block)
         
         # Шаг 13: Форматирование текста
@@ -216,6 +227,7 @@ def modern_to_html(text: str) -> str:
         # Обработка списков и таблиц в простой текстовый формат
         text = format_simple_lists(text)
         text = format_simple_tables(text)
+        text = process_simple_horizontal_rules(text)
         
         # Шаг 3: Обрабатываем эмодзи
         text = process_emoji(text)
@@ -247,7 +259,8 @@ def modern_to_html(text: str) -> str:
             if match:
                 language = match.group(1).strip() or "code"
                 code_content = match.group(2)
-                html_code_block = f'<pre><code>{html.escape(code_content)}</code></pre>'
+                # Используем <pre> без вложенного <code> для лучшей совместимости
+                html_code_block = f'<pre>{html.escape(code_content)}</pre>'
                 text = text.replace(placeholder, html_code_block)
         
         # Шаг 7: Форматирование текста
