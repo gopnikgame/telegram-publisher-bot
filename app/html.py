@@ -118,20 +118,20 @@ def markdown_to_html(text: str) -> str:
         
         # Шаг 4-9: Базовая обработка Markdown
         text = process_emoji(text)
-        text = process_headers(text)
-        text = process_quotes(text)
-        text = process_images(text)  # Добавлена обработка изображений
+        text = process_images(text)  # Обработка изображений должна идти до обработки ссылок
+        text = process_headers(text)  # Используем обновленную функцию
+        text = process_quotes(text)   # Используем обновленную функцию
         
         # Шаг 10: Базовое форматирование текста
         logger.info(f"Текст перед обработкой форматирования: {text[:100]}...")
         text = process_bold_italic_text(text)
-        text = process_bold_text(text)
+        text = process_bold_text(text)  # Используем обновленную функцию
         logger.info(f"После обработки жирного: {text[:100]}...")
-        text = process_strikethrough_text(text)
+        text = process_strikethrough_text(text)  # Используем обновленную функцию
         logger.info(f"После обработки зачеркнутого: {text[:100]}...")
         text = process_underline_text(text)
         text = process_italic_text(text)
-        text = process_links(text)
+        text = process_links(text)  # Используем обновленную функцию
         logger.info(f"После всей обработки форматирования: {text[:100]}...")
         
         # Шаг 11-12: Восстанавливаем код
