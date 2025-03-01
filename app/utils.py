@@ -49,19 +49,28 @@ def setup_logging():
 
     # Форматирование
     formatter = logging.Formatter(
-        '%(Y-%m-%d %H:%M:%S - %(name)s - %(levelname)s - %(message)s',
+        '%(asctime)s - %(name)s - %(levelname)s - %(message)s',
         datefmt='%Y-%m-%d %H:%M:%S'
     )
     main_handler.setFormatter(formatter)
     error_handler.setFormatter(formatter)
 
-    # Настройка логгера
-    logger = logging.getLogger(__name__)
-    logger.setLevel(logging.INFO)
-    logger.addHandler(main_handler)
-    logger.addHandler(error_handler)
-    logger.addHandler(logging.StreamHandler())  # Вывод в консоль
+    # Настройка корневого логгера для всего приложения
+    root_logger = logging.getLogger()
+    root_logger.setLevel(logging.INFO)
+    
+    # Удаление существующих обработчиков, чтобы избежать дублирования
+    for handler in root_logger.handlers[:]:
+        root_logger.removeHandler(handler)
+    
+    root_logger.addHandler(main_handler)
+    root_logger.addHandler(error_handler)
+    root_logger.addHandler(logging.StreamHandler())  # Вывод в консоль
 
+    # Настройка логгера для текущего модуля
+    logger = logging.getLogger(__name__)
+    logger.debug("Логирование настроено")
+    
     return logger
 
 
