@@ -75,6 +75,8 @@ def create_footer() -> str:
 async def start(update: Update, context: CallbackContext) -> None:
     """Обрабатывает команду /start."""
     chat_id = update.effective_chat.id
+    
+    # Создаем приветственное сообщение без HTML-тегов, кроме безопасных
     message = "👋 Привет! Я бот для форматирования текста.\n\n" \
               "Отправьте мне текст, и я помогу вам отформатировать его для Telegram.\n" \
               "Чтобы выбрать формат, используйте команду /format.\n\n" \
@@ -88,24 +90,34 @@ async def start(update: Update, context: CallbackContext) -> None:
     if check_admin(user_id):
         message += "\n\nКоманды администратора:\n" \
                   "/test - Включить/выключить тестовый режим\n" \
-                  "/setformat <формат> - Установить формат по умолчанию (markdown, html, modern)"
+                  "/setformat [тип] - Установить формат по умолчанию (markdown, html, modern)"
     
     # Создаем подпись
     footer = create_footer()
     if footer:
         message += footer
     
-    await context.bot.send_message(chat_id=chat_id, text=message, parse_mode=ParseMode.HTML)
+    # Отправляем сообщение без HTML-разметки для безопасности
+    try:
+        await context.bot.send_message(chat_id=chat_id, text=message)
+    except Exception as e:
+        logger.error(f"Ошибка при отправке стартового сообщения: {str(e)}", exc_info=True)
+        # Попробуем отправить без форматирования
+        await context.bot.send_message(
+            chat_id=chat_id, 
+            text="👋 Привет! Я бот для форматирования текста. Используйте /format для выбора формата."
+        )
 
 
 async def help_command(update: Update, context: CallbackContext) -> None:
     """Обрабатывает команду /help."""
     chat_id = update.effective_chat.id
-    message = "📚 <b>Справка по форматированию</b>\n\n" \
-              "<b>Поддерживаемые форматы:</b>\n" \
-              "• <b>Markdown</b> - базовое форматирование текста\n" \
-              "• <b>HTML</b> - продвинутое форматирование с HTML-тегами\n\n" \
-              "<b>Примеры Markdown:</b>\n" \
+    
+    message = "📚 *Справка по форматированию*\n\n" \
+              "*Поддерживаемые форматы:*\n" \
+              "• *Markdown* - базовое форматирование текста\n" \
+              "• *HTML* - продвинутое форматирование с HTML-тегами\n\n" \
+              "*Примеры Markdown:*\n" \
               "• **Жирный текст** для жирного\n" \
               "• *Курсив* для курсива\n" \
               "• ~~Зачеркнутый~~ для зачеркнутого\n" \
@@ -123,7 +135,20 @@ async def help_command(update: Update, context: CallbackContext) -> None:
     if footer:
         message += footer
     
-    await context.bot.send_message(chat_id=chat_id, text=message, parse_mode=ParseMode.HTML)
+    # Отправляем сообщение с Markdown форматированием вместо HTML
+    try:
+        await context.bot.send_message(
+            chat_id=chat_id, 
+            text=message, 
+            parse_mode=ParseMode.MARKDOWN_V2
+        )
+    except Exception as e:
+        logger.error(f"Ошибка при отправке справочного сообщения: {str(e)}", exc_info=True)
+        # Попробуем отправить без форматирования
+        await context.bot.send_message(
+            chat_id=chat_id, 
+            text="Справка по форматированию доступна в /format. Выберите формат для вашего текста."
+        )
 
 
 async def format_command(update: Update, context: CallbackContext) -> None:
