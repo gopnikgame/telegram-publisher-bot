@@ -55,6 +55,7 @@ def process_emoji(text: str) -> str:
 def process_bold_text(text: str) -> str:
     """Обрабатывает жирный текст в формате Markdown и преобразует его в HTML."""
     # Обработка жирного текста (** вариант)
+    # Ищем паттерны вида **текст** с пробелами или без между звездочками и текстом
     pattern = r'\*\*(.*?)\*\*'
     text = re.sub(pattern, r'<b>\1</b>', text)
     
@@ -79,6 +80,7 @@ def process_bold_italic_text(text: str) -> str:
 def process_strikethrough_text(text: str) -> str:
     """Обрабатывает зачеркнутый текст в формате Markdown и преобразует его в HTML."""
     # Обработка зачеркнутого текста (~~ вариант)
+    # Ищем паттерны вида ~~текст~~ с пробелами или без между тильдами и текстом
     pattern = r'~~(.*?)~~'
     text = re.sub(pattern, r'<s>\1</s>', text)
     
@@ -99,8 +101,11 @@ def process_code(text: str) -> str:
     text = re.sub(pattern, r'<code>\1</code>', text)
     
     # Обработка блока кода (``` вариант)
-    pattern = r'```(.*?)\n(.*?)```'
-    text = re.sub(pattern, r'<pre>\2</pre>', text, flags=re.DOTALL)
+    # Находим блоки кода с указанием языка или без
+    pattern = r'```(?:(\w+))?\n(.*?)```'
+    
+    # Заменяем с сохранением всего содержимого блока, включая переносы строк
+    text = re.sub(pattern, lambda m: f'<pre>{m.group(2)}</pre>', text, flags=re.DOTALL)
     
     return text
 
@@ -113,11 +118,12 @@ def process_quotes(text: str) -> str:
     quote_lines = []
     
     for line in lines:
-        if line.startswith('> '):
+        if line.strip().startswith('>'):
             # Начало или продолжение цитаты
             if not in_quote:
                 in_quote = True
-            quote_lines.append(line[2:])  # Убираем "> " из начала строки
+            quote_content = line.strip()[1:].strip()  # Убираем '>' и пробелы вначале
+            quote_lines.append(quote_content)
         else:
             # Конец цитаты, если была активна
             if in_quote:
@@ -255,3 +261,23 @@ def format_simple_tables(text: str) -> str:
         result.append(format_table_as_text(table_data))
     
     return '\n'.join(result)
+    
+def process_images(text: str) -> str:
+    """Обрабатывает изображения в формате Markdown."""
+    # Обработка изображений ![alt text](url "title")
+    pattern = r'!\[(.*?)\]\((.*?)(?:\s+"(.*?)")?\)'
+    
+    # Заменяем на текст, так как Telegram не поддерживает HTML-тег <img>
+    def replace_image(match):
+        alt_text = match.group(1)
+        url = match.group(2)
+        title = match.group(3) or ''
+        
+        if title:
+            return f"{alt_text} ({url} - {title})"
+        else:
+            return f"{alt_text} ({url})"
+    
+    text = re.sub(pattern, replace_image, text)
+    
+    return text
