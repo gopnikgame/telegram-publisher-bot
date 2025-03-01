@@ -5,7 +5,9 @@ import textwrap
 from datetime import datetime
 from typing import Dict, Optional, List, Union
 
-from telegram import Bot, InlineKeyboardButton, InlineKeyboardMarkup, Update, ParseMode
+from telegram import Bot, InlineKeyboardButton, InlineKeyboardMarkup, Update
+# Правильный импорт ParseMode из нового местоположения
+from telegram.constants import ParseMode
 from telegram.error import BadRequest, TelegramError
 from telegram.ext import CallbackContext, CallbackQueryHandler, CommandHandler, filters, MessageHandler, Application
 
