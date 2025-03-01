@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)  # Получаем логгер
 
 def is_html_formatted(text: str) -> bool:
     """Проверяет, содержит ли текст HTML-теги."""
-    html_tags_pattern = re.compile(r'<(/?)(b|strong|i|em|u|s|strike|del|code|pre|a|br|p|ul|ol|li|blockquote)(\s+[^>]*)?>')
+    html_tags_pattern = re.compile(r'<(/?)(strong|b|i|em|u|del|s|strike|code|pre|a|br|p|ul|ol|li|blockquote)(\s+[^>]*)?>')
     return bool(html_tags_pattern.search(text))
 
 def format_html(text: str) -> str:
@@ -24,15 +24,15 @@ def format_html(text: str) -> str:
         text = html.escape(text)  # Экранируем специальные символы сначала
         logger.info(f"Текст после экранирования HTML: {text[:100]}...")
         text = process_emoji(text)  # Обработка эмодзи
-        text = re.sub(r'\*\*\*(.*?)\*\*\*', r'<b><i>\1</i></b>', text)  # ***жирный курсив*** -> <b><i>жирный курсив</i></b>
+        text = re.sub(r'\*\*\*(.*?)\*\*\*', r'<strong><em>\1</em></strong>', text)  # ***жирный курсив*** -> <strong><em>жирный курсив</em></strong>
         logger.info(f"После обработки супержирного: {text[:100]}...")
-        text = re.sub(r'\*\*(.*?)\*\*', r'<b>\1</b>', text)  # **жирный** -> <b>жирный</b>
+        text = re.sub(r'\*\*(.*?)\*\*', r'<strong>\1</strong>', text)  # **жирный** -> <strong>жирный</strong>
         logger.info(f"После обработки жирного: {text[:100]}...")
-        text = re.sub(r'~~(.*?)~~', r'<s>\1</s>', text)  # ~~зачеркнутый~~ -> <s>зачеркнутый</s>
+        text = re.sub(r'~~(.*?)~~', r'<del>\1</del>', text)  # ~~зачеркнутый~~ -> <del>зачеркнутый</del>
         logger.info(f"После обработки зачеркнутого: {text[:100]}...")
         text = re.sub(r'__(.*?)__', r'<u>\1</u>', text)  # __подчеркнутый__ -> <u>подчеркнутый</u>
-        text = re.sub(r'_(.*?)_', r'<i>\1</i>', text)  # _курсив_ -> <i>курсив</i>
-        text = re.sub(r'\*(.*?)\*', r'<i>\1</i>', text)  # *курсив* -> <i>курсив</i>
+        text = re.sub(r'_(.*?)_', r'<em>\1</em>', text)  # _курсив_ -> <em>курсив</em>
+        text = re.sub(r'\*(.*?)\*', r'<em>\1</em>', text)  # *курсив* -> <em>курсив</em>
         text = re.sub(r'`(.*?)`', r'<code>\1</code>', text)  # `код` -> <code>код</code>
         text = re.sub(r'\[(.*?)\]\((.*?)\)', r'<a href="\2">\1</a>', text)  # [текст](ссылка) -> <a href="ссылка">текст</a>
         text = process_markdown_lists(text)  # Дополнительная обработка специальных элементов из модуля markdown
@@ -60,14 +60,14 @@ def markdown_to_html(text: str) -> str:
         text = process_quotes(text)  # Шаг 8: Обработка цитат
         text = process_horizontal_rules(text)  # Шаг 9: Обработка горизонтальных линий
         logger.info(f"Текст перед обработкой форматирования: {text[:100]}...")  # Шаг 10: Заменяем Markdown-разметку на поддерживаемые HTML-теги
-        text = re.sub(r'\*\*\*(.*?)\*\*\*', r'<b><i>\1</i></b>', text)  # Супержирный текст ***текст*** -> <b><i>текст</i></b>
-        text = re.sub(r'\*\*(.*?)\*\*', r'<b>\1</b>', text)  # Жирный текст **текст** -> <b>текст</b>
+        text = re.sub(r'\*\*\*(.*?)\*\*\*', r'<strong><em>\1</em></strong>', text)  # Супержирный текст ***текст*** -> <strong><em>текст</em></strong>
+        text = re.sub(r'\*\*(.*?)\*\*', r'<strong>\1</strong>', text)  # Жирный текст **текст** -> <strong>текст</strong>
         logger.info(f"После обработки жирного: {text[:100]}...")
-        text = re.sub(r'~~(.*?)~~', r'<s>\1</s>', text)  # Зачёркнутый текст ~~текст~~ -> <s>текст</s>
+        text = re.sub(r'~~(.*?)~~', r'<del>\1</del>', text)  # Зачёркнутый текст ~~текст~~ -> <del>текст</del>
         logger.info(f"После обработки зачеркнутого: {text[:100]}...")
         text = re.sub(r'__(.*?)__', r'<u>\1</u>', text)  # Подчёркнутый текст __текст__ -> <u>текст</u>
-        text = re.sub(r'(?<!\*)\*([^\*]+)\*(?!\*)', r'<i>\1</i>', text)  # Курсив *текст* -> <i>текст</i>
-        text = re.sub(r'(?<!_)_([^_]+)_(?!_)', r'<i>\1</i>', text)  # Курсив _текст_ -> <i>текст</i>
+        text = re.sub(r'(?<!\*)\*([^\*]+)\*(?!\*)', r'<em>\1</em>', text)  # Курсив *текст* -> <em>текст</em>
+        text = re.sub(r'(?<!_)_([^_]+)_(?!_)', r'<em>\1</em>', text)  # Курсив _текст_ -> <em>текст</em>
         text = re.sub(r'\[(.*?)\]\((.*?)\)', r'<a href="\2">\1</a>', text)  # Ссылки [текст](ссылка) -> <a href="ссылка">текст</a>
         logger.info(f"После всей обработки форматирования: {text[:100]}...")
         for placeholder, code in inline_code.items():  # Шаг 11: Восстанавливаем inline код с преобразованием в HTML
@@ -99,14 +99,14 @@ def modern_to_html(text: str) -> str:
         text = html.escape(text)  # Шаг 2: Экранируем HTML-специальные символы
         text = process_emoji(text)  # Шаг 3: Обрабатываем эмодзи
         logger.info(f"Перед обработкой форматирования Modern: {text[:100]}...")  # Шаг 4: Заменяем Modern-разметку на HTML-теги
-        text = re.sub(r'\*\*\*(.*?)\*\*\*', r'<b><i>\1</i></b>', text)  # Жирный курсив ***текст*** -> <b><i>текст</i></b>
-        text = re.sub(r'\*\*(.*?)\*\*', r'<b>\1</b>', text)  # Жирный **текст** -> <b>текст</b>
+        text = re.sub(r'\*\*\*(.*?)\*\*\*', r'<strong><em>\1</em></strong>', text)  # Жирный курсив ***текст*** -> <strong><em>текст</em></strong>
+        text = re.sub(r'\*\*(.*?)\*\*', r'<strong>\1</strong>', text)  # Жирный **текст** -> <strong>текст</strong>
         logger.info(f"После обработки жирного Modern: {text[:100]}...")
-        text = re.sub(r'~~(.*?)~~', r'<s>\1</s>', text)  # Зачеркнутый ~~текст~~ -> <s>текст</s>
+        text = re.sub(r'~~(.*?)~~', r'<del>\1</del>', text)  # Зачеркнутый ~~текст~~ -> <del>текст</del>
         logger.info(f"После обработки зачеркнутого Modern: {text[:100]}...")
         text = re.sub(r'__(.*?)__', r'<u>\1</u>', text)  # Подчеркнутый __текст__ -> <u>текст</u>
-        text = re.sub(r'_(.*?)_', r'<i>\1</i>', text)  # Курсив _текст_ -> <i>текст</i>
-        text = re.sub(r'~(.*?)~', r'<s>\1</s>', text)  # Также поддерживаем зачеркнутый ~текст~ (один символ ~ в Modern)
+        text = re.sub(r'_(.*?)_', r'<em>\1</em>', text)  # Курсив _текст_ -> <em>текст</em>
+        text = re.sub(r'~(.*?)~', r'<del>\1</del>', text)  # Также поддерживаем зачеркнутый ~текст~ (один символ ~ в Modern)
         text = re.sub(r'\[(.*?)\]\((.*?)\)', r'<a href="\2">\1</a>', text)  # Ссылки [текст](ссылка) -> <a href="ссылка">текст</a>
         logger.info(f"После всей обработки форматирования Modern: {text[:100]}...")
         text = process_markdown_lists(text)  # Шаг 5: Обработка специальных элементов форматирования
