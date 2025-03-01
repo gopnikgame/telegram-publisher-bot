@@ -30,13 +30,15 @@ def format_html(text: str) -> str:
         logger.info("Конвертируем разметку в HTML")
         # Экранируем специальные символы сначала
         text = html.escape(text)
-        # Затем заменяем разметку на HTML-теги
+        # Заменяем разметку на HTML-теги
+        text = re.sub(r'\*\*\*(.*?)\*\*\*', r'<b><i>\1</i></b>', text)  # ***жирный курсив*** -> <b><i>жирный курсив</i></b>
         text = re.sub(r'\*\*(.*?)\*\*', r'<b>\1</b>', text)  # **жирный** -> <b>жирный</b>
         text = re.sub(r'__(.*?)__', r'<u>\1</u>', text)  # __подчеркнутый__ -> <u>подчеркнутый</u>
         text = re.sub(r'_(.*?)_', r'<i>\1</i>', text)  # _курсив_ -> <i>курсив</i>
         text = re.sub(r'\*(.*?)\*', r'<i>\1</i>', text)  # *курсив* -> <i>курсив</i>
         text = re.sub(r'~~(.*?)~~', r'<s>\1</s>', text)  # ~~зачеркнутый~~ -> <s>зачеркнутый</s>
         text = re.sub(r'`(.*?)`', r'<code>\1</code>', text)  # `код` -> <code>код</code>
+        text = re.sub(r'\[(.*?)\]\((.*?)\)', r'<a href="\2">\1</a>', text)  # [текст](ссылка) -> <a href="ссылка">текст</a>
     return text
 
 
@@ -109,9 +111,6 @@ def markdown_to_html(text: str) -> str:
         logger.error(f"Ошибка преобразования Markdown в HTML для Telegram: {e}")
         return text
 
-    except Exception as e:
-        logger.error(f"Ошибка преобразования Markdown в HTML: {e}")
-        return text
 
 def modern_to_html(text: str) -> str:
     """
@@ -123,10 +122,13 @@ def modern_to_html(text: str) -> str:
         text = html.escape(text)  # Экранируем HTML-специальные символы
 
         # Заменяем Modern-разметку на HTML-теги
-        text = re.sub(r'\*(.*?)\*', r'<b>\1</b>', text)  # *жирный* -> <b>жирный</b>
-        text = re.sub(r'_(.*?)_', r'<u>\1</u>', text)  # _подчеркнутый_ -> <u>подчеркнутый</u>
+        text = re.sub(r'\*\*\*(.*?)\*\*\*', r'<b><i>\1</i></b>', text)  # ***жирный курсив*** -> <b><i>жирный курсив</i></b>
+        text = re.sub(r'\*\*(.*?)\*\*', r'<b>\1</b>', text)  # **жирный** -> <b>жирный</b>
+        text = re.sub(r'__(.*?)__', r'<u>\1</u>', text)  # __подчеркнутый__ -> <u>подчеркнутый</u>
+        text = re.sub(r'_(.*?)_', r'<i>\1</i>', text)  # _курсив_ -> <i>курсив</i>
         text = re.sub(r'~(.*?)~', r'<s>\1</s>', text)  # ~зачеркнутый~ -> <s>зачеркнутый</s>
         text = re.sub(r'`(.*?)`', r'<code>\1</code>', text)  # `код` -> <code>код</code>
+        text = re.sub(r'\[(.*?)\]\((.*?)\)', r'<a href="\2">\1</a>', text)  # [текст](ссылка) -> <a href="ссылка">текст</a>
 
         # Удаляем лишние пробелы и добавляем \n\n, если необходимо
         text = text.strip() + "\n\n" if not text.endswith("\n\n") else text
