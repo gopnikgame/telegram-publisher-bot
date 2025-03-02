@@ -28,12 +28,7 @@ STATE_NORMAL = 'normal'
 STATE_TEST_MODE = 'test_mode'
 
 # Список администраторов (ID пользователей)
-ADMIN_IDS = [
-    int(admin_id.strip()) for admin_id in config.ADMIN_IDS.split(',')
-] if isinstance(config.ADMIN_IDS, str) else [
-    int(admin_id) if isinstance(admin_id, str) else admin_id for admin_id in config.ADMIN_IDS
-] if isinstance(config.ADMIN_IDS, list) else []
-
+ADMIN_IDS = config.ADMIN_IDS
 logger.info(f"Загружены ID администраторов: {ADMIN_IDS}")
 
 def check_admin(user_id: int) -> bool:
