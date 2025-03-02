@@ -12,6 +12,7 @@ from telegram.ext import CallbackContext, CallbackQueryHandler, CommandHandler, 
 
 from .html import recreate_markdown_from_entities, markdown_to_html, modern_to_html
 from .config import config
+from .utils import format_bot_links, append_links_to_message, format_message  # Добавляем импорт функции format_message
 
 # Настройка логирования
 logger = logging.getLogger(__name__)
@@ -46,25 +47,10 @@ def check_admin(user_id: int) -> bool:
     """
     return user_id in ADMIN_IDS
 
+# Заменяем функцию create_footer() на использование функций из utils.py
 def create_footer() -> str:
-    """Создает подпись для сообщений."""
-    footer_parts = []
-    
-    # Добавляем ссылку на канал
-    if hasattr(config, 'CHANNEL_LINK') and config.CHANNEL_LINK and hasattr(config, 'CHANNEL_NAME') and config.CHANNEL_NAME:
-        footer_parts.append(f'[{config.CHANNEL_NAME}]({config.CHANNEL_LINK})')
-    
-    # Добавляем ссылку на основной бот
-    if hasattr(config, 'MAIN_BOT_LINK') and config.MAIN_BOT_LINK and hasattr(config, 'MAIN_BOT_NAME') and config.MAIN_BOT_NAME:
-        footer_parts.append(f'[{config.MAIN_BOT_NAME}]({config.MAIN_BOT_LINK})')
-    
-    # Добавляем ссылку на техподдержку
-    if hasattr(config, 'SUPPORT_BOT_LINK') and config.SUPPORT_BOT_LINK and hasattr(config, 'SUPPORT_BOT_NAME') and config.SUPPORT_BOT_NAME:
-        footer_parts.append(f'[{config.SUPPORT_BOT_NAME}]({config.SUPPORT_BOT_LINK})')
-    
-    if footer_parts:
-        return "\n" + " | ".join(footer_parts)
-    return ""
+    """Создает подпись для сообщений с использованием format_bot_links."""
+    return format_bot_links('html')  # Используем HTML формат для ссылок
 
 async def send_formatted_message(
     context: CallbackContext,
@@ -88,10 +74,13 @@ async def send_formatted_message(
         target_chat_id: ID целевого чата для отправки сообщения.
     """
     try:
+        # Используем format_message из utils.py
         formatted_text = format_message(message_text, format_type)
         
         if footer:
-            formatted_text += footer
+            # Подпись уже должна быть добавлена в format_message
+            # Не добавляем ее здесь еще раз
+            pass
         
         parse_mode = ParseMode.HTML
         
