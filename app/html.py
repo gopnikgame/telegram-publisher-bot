@@ -34,10 +34,23 @@ def recreate_markdown_from_entities(text: str, entities: list) -> str:
     # Создаем копию текста для модификации
     result = text
     
+    # Отслеживаем уже обработанные участки
+    processed_ranges = []
+    
     for entity in sorted_entities:
         start = entity.offset
         end = entity.offset + entity.length
         
+        # Проверяем, не обрабатываем ли мы уже обработанный участок
+        skip = False
+        for pr_start, pr_end in processed_ranges:
+            if (start >= pr_start and start < pr_end) or (end > pr_start and end <= pr_end):
+                skip = True
+                break
+        
+        if skip:
+            continue
+            
         # Получаем текст внутри сущности
         entity_text = text[start:end]
         
@@ -62,6 +75,9 @@ def recreate_markdown_from_entities(text: str, entities: list) -> str:
         
         # Заменяем часть текста на текст с маркерами
         result = result[:start] + formatted_text + result[end:]
+        
+        # Добавляем диапазон в список обработанных
+        processed_ranges.append((start, end))
     
     return result
 
