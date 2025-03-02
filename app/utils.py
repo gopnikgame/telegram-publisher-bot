@@ -5,7 +5,6 @@ from datetime import datetime
 from typing import List, Optional
 from logging.handlers import RotatingFileHandler
 import html  # Для экранирования HTML
-import urllib.parse  # Для экранирования URL
 
 from app.config import config
 from .html import is_html_formatted, format_html, markdown_to_html, modern_to_html
@@ -79,8 +78,6 @@ def format_bot_links(format_type: str = 'markdown') -> str:
     Форматирование ссылок ботов и канала.
     :param format_type: Тип форматирования (markdown, html, plain, modern).
     """
-    from app.config import config
-
     links = []
 
     def format_link(name: str, url: str) -> str:
@@ -98,7 +95,8 @@ def format_bot_links(format_type: str = 'markdown') -> str:
         links.append(format_link(config.SUPPORT_BOT_NAME, config.SUPPORT_BOT_LINK))
 
     return ' | '.join(links) if links else ""
-    
+
+
 def append_links_to_message(text: str, format_type: str = 'markdown') -> str:
     """
     Добавляет отформатированные ссылки к сообщению.
@@ -109,6 +107,7 @@ def append_links_to_message(text: str, format_type: str = 'markdown') -> str:
     if links:
         return f"{text}\n\n{links}"  # Добавляем две строки перед ссылками
     return text
+
 
 def format_message(text: str, format_type: str = 'markdown') -> str:
     """
@@ -159,8 +158,6 @@ def check_file_size(size: int, max_size: Optional[int] = None) -> bool:
     :param size: Размер файла в байтах.
     :param max_size: Максимальный допустимый размер файла (опционально).
     """
-    from app.config import config
-
     limit = max_size or config.MAX_FILE_SIZE
     if size > limit:
         raise FileSizeError(f"Размер файла ({size} байт) превышает лимит ({limit} байт)")
