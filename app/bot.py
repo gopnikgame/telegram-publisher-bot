@@ -335,14 +335,80 @@ async def button_handler(update: Update, context: CallbackContext) -> None:
         
         logger.info(f"Пользователь {user_id} выбрал формат: {format_type}")
 
-async def handle_message(update: Update, context: CallbackContext) -> None:
-    """Обрабатывает обычные текстовые сообщения."""
+# async def handle_message(update: Update, context: CallbackContext) -> None:
+    # """Обрабатывает обычные текстовые сообщения."""
+    # message = update.message
+    # user_id = message.from_user.id
+    # chat_id = message.chat_id
+    
+    # # Получаем текст сообщения
+    # text = message.text
+    
+    # # Восстанавливаем форматирование из entities если они есть
+    # if message.entities:
+        # logger.info(f"Найдены entities: {message.entities}")
+        # from .html import recreate_markdown_from_entities
+        # text = recreate_markdown_from_entities(text, message.entities)
+        # logger.info(f"Текст после восстановления форматирования: {text[:100]}...")
+    
+    # # Проверяем, находится ли пользователь в состоянии ожидания сообщения
+    # state = user_states.get(user_id, STATE_NORMAL)
+    
+    # # Если пользователь не в состоянии ожидания формата или сообщения, устанавливаем формат по умолчанию
+    # if state not in (STATE_AWAITING_FORMAT, STATE_AWAITING_MESSAGE):
+        # format_type = context.user_data.get("format", context.bot_data.get("default_format", config.DEFAULT_FORMAT)).lower()
+    # else:
+        # format_type = context.user_data.get("format", "markdown").lower()
+    
+    # logger.info(f"Получено сообщение: {text}")
+    # logger.info(f"Формат сообщения: {format_type}")
+    
+    # # Создаем подпись используя utils.py
+    # footer = format_bot_links(format_type)
+    
+    # # Проверяем, находится ли пользователь в тестовом режиме
+    # test_mode_enabled = state == STATE_TEST_MODE
+    
+    # # Определяем целевой чат
+    # if test_mode_enabled:
+        # target_chat_id = config.TEST_CHAT_ID if config.TEST_CHAT_ID != 0 else chat_id
+    # else:
+        # target_chat_id = config.CHANNEL_ID if config.CHANNEL_ID != 0 else chat_id
+    
+    # await send_formatted_message(
+        # context,
+        # chat_id,
+        # text,
+        # format_type,
+        # footer,
+        # test_mode_enabled,
+        # target_chat_id
+    # )
+    
+async def handle_all_messages(update: Update, context: CallbackContext) -> None:
+    """Обрабатывает все типы сообщений и восстанавливает форматирование."""
     message = update.message
     user_id = message.from_user.id
     chat_id = message.chat_id
     
-    # Получаем текст сообщения
-    text = message.text
+    from .html import recreate_markdown_from_entities
+    
+    # Определяем текст и entities в зависимости от типа сообщения
+    if message.text:
+        text = message.text
+        entities = message.entities
+    elif message.caption:
+        text = message.caption
+        entities = message.caption_entities
+    else:
+        logger.info("Сообщение не содержит текста или подписи к медиа")
+        return
+    
+    # Восстанавливаем форматирование из entities если они есть
+    if entities:
+        logger.info(f"Найдены entities: {entities}")
+        text = recreate_markdown_from_entities(text, entities)
+        logger.info(f"Текст после восстановления форматирования: {text[:100]}...")
     
     # Проверяем, находится ли пользователь в состоянии ожидания сообщения
     state = user_states.get(user_id, STATE_NORMAL)
@@ -565,8 +631,11 @@ def setup_handlers(application: Application) -> None:
     # Регистрируем обработчик для кнопок
     application.add_handler(CallbackQueryHandler(button_handler))
     
-    # Регистрируем обработчик для обычных сообщений
-    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+    # Регистрируем обработчик для обычных текстовых сообщений
+    #application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+    
+    # Для полного решения можно заменить верхнюю строку на:
+    application.add_handler(MessageHandler((filters.TEXT | filters.CAPTION) & ~filters.COMMAND, handle_all_messages))
     
     # Регистрируем обработчик ошибок
     application.add_error_handler(error_handler)
