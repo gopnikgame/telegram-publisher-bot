@@ -98,7 +98,7 @@ async def send_formatted_message(
             chat_id=target_chat_id,
             text=formatted_text,
             parse_mode=parse_mode,
-            disable_web_page_preview=False
+            disable_web_page_preview=True
         )
         
         success_message = "✅ Сообщение успешно отправлено."
