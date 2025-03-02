@@ -1,5 +1,4 @@
 import logging
-import os
 import signal
 import asyncio
 from telegram.ext import Application
@@ -11,12 +10,11 @@ from app.utils import setup_logging
 setup_logging()
 logger = logging.getLogger(__name__)
 
-async def main() -> None:
-    """Start the bot."""
-    logger.info("Инициализация бота...")
+def setup_application():
+    """Настройка приложения Telegram."""
     if not config.BOT_TOKEN:
         logger.error("BOT_TOKEN не установлен в .env файле")
-        return
+        return None
 
     # Создаем экземпляр Application
     application = (
@@ -29,7 +27,10 @@ async def main() -> None:
         .proxy(config.HTTPS_PROXY if config.HTTPS_PROXY else None)  # Прокси, если используется
         .build()
     )
+    return application
 
+async def run_bot(application):
+    """Запуск бота."""
     try:
         # Инициализируем приложение
         await application.initialize()
@@ -69,9 +70,14 @@ async def main() -> None:
             await application.stop()
         await application.shutdown()
 
-if __name__ == "__main__":
-    import asyncio
+async def main() -> None:
+    """Основная функция для запуска бота."""
+    logger.info("Инициализация бота...")
+    application = setup_application()
+    if application:
+        await run_bot(application)
 
+if __name__ == "__main__":
     try:
         # Запускаем бота с помощью asyncio.run()
         asyncio.run(main())
