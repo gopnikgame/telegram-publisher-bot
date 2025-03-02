@@ -5,6 +5,7 @@ import string
 import html
 from typing import Dict, Tuple, List
 
+logger = logging.getLogger(__name__)
 
 def extract_and_save_placeholders(text: str, pattern: str) -> Tuple[str, Dict[str, str]]:
     """
@@ -49,7 +50,7 @@ def restore_placeholders(text: str, placeholders: Dict[str, str]) -> str:
 
 def process_emoji(text: str) -> str:
     """Замена стандартных эмодзи на HTML-эмодзи."""
-    # Данная функция оставляет эмодзи без изменений, так как Telegram их поддерживает
+    # Telegram поддерживает эмодзи без изменений
     return text
 
 def process_bold_text(text: str) -> str:
@@ -66,9 +67,9 @@ def process_bold_text(text: str) -> str:
             continue
         elif line.strip() == '**' and in_bold:
             in_bold = False
-            # Оборачиваем накопленный текст в тег <b>
+            # Оборачиваем накопленный текст в тег
             if bold_text:
-                result.append(f'<b>{" ".join(bold_text)}</b>')
+                result.append(f"<b>{' '.join(bold_text)}</b>")
                 bold_text = []
             continue
         
@@ -116,9 +117,9 @@ def process_strikethrough_text(text: str) -> str:
             continue
         elif line.strip() == '~~' and in_strike:
             in_strike = False
-            # Оборачиваем накопленный текст в тег <s>
+            # Оборачиваем накопленный текст в тег
             if strike_text:
-                result.append(f'<s>{" ".join(strike_text)}</s>')
+                result.append(f"<s>{' '.join(strike_text)}</s>")
                 strike_text = []
             continue
         
@@ -138,8 +139,8 @@ def process_strikethrough_text(text: str) -> str:
 
 def process_underline_text(text: str) -> str:
     """Обрабатывает подчеркнутый текст в формате Markdown и преобразует его в HTML."""
-    # Обработка подчеркнутого текста (__$ вариант$__)
-    pattern = r'__\$(.*?)\$__'
+    # Обработка подчеркнутого текста (__ вариант)
+    pattern = r'__(.*?)__'
     text = re.sub(pattern, r'<u>\1</u>', text)
     
     return text
@@ -155,7 +156,7 @@ def process_code(text: str) -> str:
     pattern = r'```(?:(\w+))?\n(.*?)```'
     
     # Заменяем с сохранением всего содержимого блока, включая переносы строк
-    text = re.sub(pattern, lambda m: f'<pre>{m.group(2)}</pre>', text, flags=re.DOTALL)
+    text = re.sub(pattern, r'<pre>\2</pre>', text, flags=re.DOTALL)
     
     return text
 
@@ -172,20 +173,20 @@ def process_quotes(text: str) -> str:
             # Начало или продолжение цитаты
             if not in_quote:
                 in_quote = True
-            quote_content = line.strip()[1:].strip()  # Убираем '>' и пробелы вначале
+            quote_content = line.strip()[1:].strip()  # Убираем '>' и пробелы в начале
             quote_lines.append(quote_content)
         else:
             # Конец цитаты, если была активна
             if in_quote:
-                # Telegram поддерживает только <i> для цитат, не <blockquote>
-                result.append(f'<i>{" ".join(quote_lines)}</i>')
+                # Telegram поддерживает только <blockquote> для цитат, но мы используем <i> для простоты
+                result.append(f"<blockquote>{' '.join(quote_lines)}</blockquote>")
                 quote_lines = []
                 in_quote = False
             result.append(line)
     
     # Если цитата не была закрыта
     if in_quote:
-        result.append(f'<i>{" ".join(quote_lines)}</i>')
+        result.append(f"<blockquote>{' '.join(quote_lines)}</blockquote>")
     
     return '\n'.join(result)
 
@@ -205,11 +206,11 @@ def process_headers(text: str) -> str:
             content = header_match.group(2)
             # Используем жирный текст вместо <h1>-<h6> для совместимости с Telegram
             if level == 1:
-                result.append(f'<b>{content}</b>')  # H1 - просто жирный
+                result.append(f"<b>{content}</b>")  # H1 - просто жирный
             elif level == 2:
-                result.append(f'<b>{content}</b>')  # H2 - жирный 
+                result.append(f"<b>{content}</b>")  # H2 - жирный
             else:
-                result.append(f'<b>{content}</b>')  # H3-H6 - жирный
+                result.append(f"<b>{content}</b>")  # H3-H6 - жирный
         else:
             result.append(line)
     
@@ -224,7 +225,7 @@ def process_links(text: str) -> str:
         text = match.group(1)
         url = match.group(2)
         # Игнорируем title (Telegram не поддерживает title в <a>)
-        return f'<a href="{url}">{text}</a>'
+        return f'<a href="{html.escape(url)}">{html.escape(text)}</a>'
     
     text = re.sub(pattern, replace_link, text)
     
@@ -264,7 +265,7 @@ def process_simple_horizontal_rules(text: str) -> str:
     text = re.sub(r'^___+$', '----------', text, flags=re.MULTILINE)
     return text
 
-def format_table_as_text(table_data):
+def format_table_as_text(table_data: List[List[str]]) -> str:
     """
     Форматирует данные таблицы в виде простого текста без тегов HTML.
     """
@@ -294,7 +295,7 @@ def format_table_as_text(table_data):
 
 def format_simple_tables(text: str) -> str:
     """
-    Преобразует markdown таблицы в простой текстовый формат.
+    Преобразует Markdown таблицы в простой текстовый формат.
     """
     lines = text.split('\n')
     result = []
@@ -327,7 +328,7 @@ def format_simple_tables(text: str) -> str:
         result.append(format_table_as_text(table_data))
     
     return '\n'.join(result)
-    
+
 def process_images(text: str) -> str:
     """Обрабатывает изображения в формате Markdown."""
     # Обработка изображений ![alt text](url "title")
