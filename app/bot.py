@@ -12,20 +12,46 @@ from telegram.ext import CallbackContext, CallbackQueryHandler, CommandHandler, 
 
 from .html import recreate_markdown_from_entities, markdown_to_html, modern_to_html
 from .config import config
-# Импортируем все необходимые функции из utils.py
+# Импортируем необходимые функции из utils.py
 from .utils import format_message, format_bot_links, append_links_to_message
 
 # Настройка логирования
 logger = logging.getLogger(__name__)
 
-# [Остальной код остается без изменений...]
+# Словарь для хранения состояний пользователя
+user_states = {}
 
-# Заменяем функцию create_footer() на прямой вызов format_bot_links из utils.py
+# Константы для состояний пользователя
+STATE_AWAITING_FORMAT = 'awaiting_format'
+STATE_AWAITING_MESSAGE = 'awaiting_message'
+STATE_NORMAL = 'normal'
+STATE_TEST_MODE = 'test_mode'
+
+# Список администраторов (ID пользователей)
+ADMIN_IDS = [
+    int(admin_id.strip()) for admin_id in config.ADMIN_IDS.split(',')
+] if isinstance(config.ADMIN_IDS, str) else [
+    int(admin_id) if isinstance(admin_id, str) else admin_id for admin_id in config.ADMIN_IDS
+] if isinstance(config.ADMIN_IDS, list) else []
+
+logger.info(f"Загружены ID администраторов: {ADMIN_IDS}")
+
+def check_admin(user_id: int) -> bool:
+    """
+    Проверяет, является ли пользователь администратором.
+    
+    Args:
+        user_id: ID пользователя для проверки
+        
+    Returns:
+        bool: True, если пользователь администратор, иначе False
+    """
+    return user_id in ADMIN_IDS
+
 def create_footer() -> str:
-    """Создает подпись для сообщений, используя функцию из utils.py."""
-    return format_bot_links('html')
+    """Создает подпись для сообщений с использованием format_bot_links."""
+    return format_bot_links('html')  # Используем HTML формат для ссылок
 
-# Изменяем send_formatted_message, чтобы использовать format_message из utils.py
 async def send_formatted_message(
     context: CallbackContext,
     chat_id: int,
@@ -37,15 +63,28 @@ async def send_formatted_message(
 ) -> None:
     """
     Отправляет форматированное сообщение.
+    
+    Args:
+        context: Контекст обратного вызова.
+        chat_id: ID чата, куда отправляется сообщение.
+        message_text: Текст сообщения.
+        format_type: Тип формата (markdown, html, modern).
+        footer: Подпись для сообщения.
+        test_mode_enabled: Флаг тестового режима.
+        target_chat_id: ID целевого чата для отправки сообщения.
     """
     try:
-        # Используем format_message из utils.py для форматирования
+        # Используем функцию format_message из utils.py
         formatted_text = format_message(message_text, format_type)
+        
+        # Добавляем подпись только если она еще не была добавлена в format_message
+        if footer and footer not in formatted_text:
+            formatted_text += f"\n\n{footer}"
         
         parse_mode = ParseMode.HTML
         
-        # Остальная логика отправки сообщения...
         if test_mode_enabled:
+            # Показываем предпросмотр с безопасно заменёнными символами
             safe_preview = message_text.replace("<", "&lt;").replace(">", "&gt;")
             preview_message = f"📝 Предпросмотр сообщения:\n\n{safe_preview[:500]}"
             if len(safe_preview) > 500:
@@ -86,6 +125,7 @@ async def send_formatted_message(
         )
         
         if test_mode_enabled:
+            # Безопасно отображаем текст с ошибкой
             safe_text = message_text.replace("<", "&lt;").replace(">", "&gt;")
             debug_info = (
                 f"🔍 Детали ошибки:\n\n"
@@ -99,7 +139,6 @@ async def send_formatted_message(
                 text=debug_info
             )
 
-# В функции start используем append_links_to_message из utils.py
 async def start(update: Update, context: CallbackContext) -> None:
     """Обрабатывает команду /start."""
     chat_id = update.effective_chat.id
@@ -122,7 +161,7 @@ async def start(update: Update, context: CallbackContext) -> None:
         message += "/test - Включить/выключить тестовый режим\n"
         message += "/setformat [тип] - Установить формат по умолчанию (markdown, html, modern)"
     
-    # Используем append_links_to_message из utils.py для добавления подписи
+    # Используем функцию append_links_to_message из utils.py
     message = append_links_to_message(message, 'html')
     
     # Отправляем сообщение
@@ -136,36 +175,34 @@ async def start(update: Update, context: CallbackContext) -> None:
             text="👋 Привет! Я бот для форматирования текста. Используйте /format для выбора формата."
         )
 
-
 async def help_command(update: Update, context: CallbackContext) -> None:
     """Обрабатывает команду /help."""
     chat_id = update.effective_chat.id
     
+    # Для Markdown V2 нужно экранировать специальные символы
     message = (
         "📚 *Справка по форматированию*\n\n"
         "*Поддерживаемые форматы:*\n"
-        "• *Markdown* - базовое форматирование текста\n"
-        "• *HTML* - продвинутое форматирование с HTML-тегами\n\n"
+        "• *Markdown* \\- базовое форматирование текста\n"
+        "• *HTML* \\- продвинутое форматирование с HTML\\-тегами\n\n"
         "*Примеры Markdown:*\n"
-        "• **Жирный текст** для жирного\n"
-        "• *Курсив* для курсива\n"
-        "• ~~Зачеркнутый~~ для зачеркнутого\n"
-        "• `Код` для монопространственного шрифта\n"
-        "• ```\nБлок кода\n``` для блока кода\n"
-        "• > Цитата для цитирования\n"
-        "• # Заголовок для заголовков\n"
-        "• 1. Пункт для нумерованных списков\n"
-        "• - Пункт для маркированных списков\n"
-        "• [Текст](https://example.com) для ссылок\n\n"
-        "Используйте команду /format, чтобы выбрать предпочтительный формат."
+        "• \\*\\*Жирный текст\\*\\* для жирного\n"
+        "• \\*Курсив\\* для курсива\n"
+        "• \\~\\~Зачеркнутый\\~\\~ для зачеркнутого\n"
+        "• \\`Код\\` для монопространственного шрифта\n"
+        "• \\`\\`\\`\nБлок кода\n\\`\\`\\` для блока кода\n"
+        "• \\> Цитата для цитирования\n"
+        "• \\# Заголовок для заголовков\n"
+        "• 1\\. Пункт для нумерованных списков\n"
+        "• \\- Пункт для маркированных списков\n"
+        "• \\[Текст\\]\\(https://example\\.com\\) для ссылок\n\n"
+        "Используйте команду /format, чтобы выбрать предпочтительный формат\\."
     )
     
-    # Создаем подпись
-    footer = create_footer()
-    if footer:
-        message += footer
+    # Используем функцию append_links_to_message из utils.py
+    message = append_links_to_message(message, 'markdown')
     
-    # Отправляем сообщение с Markdown форматированием вместо HTML
+    # Отправляем сообщение с форматированием
     try:
         await context.bot.send_message(
             chat_id=chat_id, 
@@ -309,7 +346,7 @@ async def handle_message(update: Update, context: CallbackContext) -> None:
     user_id = message.from_user.id
     chat_id = message.chat_id
     
-    # Получаем текст и формат сообщения
+    # Получаем текст сообщения
     text = message.text
     
     # Проверяем, находится ли пользователь в состоянии ожидания сообщения
@@ -324,8 +361,8 @@ async def handle_message(update: Update, context: CallbackContext) -> None:
     logger.info(f"Получено сообщение: {text}")
     logger.info(f"Формат сообщения: {format_type}")
     
-    # Создаем подпись
-    footer = create_footer()
+    # Создаем подпись используя utils.py
+    footer = format_bot_links(format_type)
     
     # Проверяем, находится ли пользователь в тестовом режиме
     test_mode_enabled = state == STATE_TEST_MODE
@@ -399,12 +436,15 @@ async def send_to_channel(update: Update, context: CallbackContext) -> None:
     format_type = context.user_data.get("format", context.bot_data.get("default_format", config.DEFAULT_FORMAT)).lower()
     logger.info(f"Формат сообщения для канала: {format_type}")
     
+    # Создаем подпись
+    footer = format_bot_links(format_type)
+    
     await send_formatted_message(
         context,
         chat_id,
         message_text,
         format_type,
-        create_footer(),
+        footer,
         test_mode_enabled,
         target_chat_id
     )
@@ -493,7 +533,7 @@ async def error_handler(update: Update, context: CallbackContext) -> None:
             
             # Для админов показываем более подробную информацию
             user_id = update.effective_user.id if update.effective_user else None
-            if user_id and check_admin(user_id):
+            if user_id and user_id in ADMIN_IDS:
                 error_message += f"\n\nДетали ошибки: {str(error)}"
                 
                 # Добавляем информацию о контексте
@@ -533,6 +573,7 @@ def setup_handlers(application: Application) -> None:
     # Регистрируем обработчик для обычных сообщений
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     
+    # Регистрируем обработчик ошибок
     application.add_error_handler(error_handler)
     
     logger.info("Обработчики сообщений установлены")
