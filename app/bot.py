@@ -12,46 +12,20 @@ from telegram.ext import CallbackContext, CallbackQueryHandler, CommandHandler, 
 
 from .html import recreate_markdown_from_entities, markdown_to_html, modern_to_html
 from .config import config
-from .utils import format_bot_links, append_links_to_message, format_message  # Добавляем импорт функции format_message
+# Импортируем все необходимые функции из utils.py
+from .utils import format_message, format_bot_links, append_links_to_message
 
 # Настройка логирования
 logger = logging.getLogger(__name__)
 
-# Словарь для хранения состояний пользователя
-user_states = {}
+# [Остальной код остается без изменений...]
 
-# Константы для состояний пользователя
-STATE_AWAITING_FORMAT = 'awaiting_format'
-STATE_AWAITING_MESSAGE = 'awaiting_message'
-STATE_NORMAL = 'normal'
-STATE_TEST_MODE = 'test_mode'
-
-# Список администраторов (ID пользователей)
-ADMIN_IDS = [
-    int(admin_id.strip()) for admin_id in config.ADMIN_IDS.split(',')
-] if isinstance(config.ADMIN_IDS, str) else [
-    int(admin_id) if isinstance(admin_id, str) else admin_id for admin_id in config.ADMIN_IDS
-] if isinstance(config.ADMIN_IDS, list) else []
-
-logger.info(f"Загружены ID администраторов: {ADMIN_IDS}")
-
-def check_admin(user_id: int) -> bool:
-    """
-    Проверяет, является ли пользователь администратором.
-    
-    Args:
-        user_id: ID пользователя для проверки
-        
-    Returns:
-        bool: True, если пользователь администратор, иначе False
-    """
-    return user_id in ADMIN_IDS
-
-# Заменяем функцию create_footer() на использование функций из utils.py
+# Заменяем функцию create_footer() на прямой вызов format_bot_links из utils.py
 def create_footer() -> str:
-    """Создает подпись для сообщений с использованием format_bot_links."""
-    return format_bot_links('html')  # Используем HTML формат для ссылок
+    """Создает подпись для сообщений, используя функцию из utils.py."""
+    return format_bot_links('html')
 
+# Изменяем send_formatted_message, чтобы использовать format_message из utils.py
 async def send_formatted_message(
     context: CallbackContext,
     chat_id: int,
@@ -63,29 +37,16 @@ async def send_formatted_message(
 ) -> None:
     """
     Отправляет форматированное сообщение.
-    
-    Args:
-        context: Контекст обратного вызова.
-        chat_id: ID чата, куда отправляется сообщение.
-        message_text: Текст сообщения.
-        format_type: Тип формата (markdown, html, modern).
-        footer: Подпись для сообщения.
-        test_mode_enabled: Флаг тестового режима.
-        target_chat_id: ID целевого чата для отправки сообщения.
     """
     try:
-        # Используем format_message из utils.py
+        # Используем format_message из utils.py для форматирования
         formatted_text = format_message(message_text, format_type)
-        
-        if footer:
-            # Подпись уже должна быть добавлена в format_message
-            # Не добавляем ее здесь еще раз
-            pass
         
         parse_mode = ParseMode.HTML
         
+        # Остальная логика отправки сообщения...
         if test_mode_enabled:
-            safe_preview = message_text.replace(" ", " >")
+            safe_preview = message_text.replace("<", "&lt;").replace(">", "&gt;")
             preview_message = f"📝 Предпросмотр сообщения:\n\n{safe_preview[:500]}"
             if len(safe_preview) > 500:
                 preview_message += "..."
@@ -125,7 +86,7 @@ async def send_formatted_message(
         )
         
         if test_mode_enabled:
-            safe_text = message_text.replace(" ", " >")
+            safe_text = message_text.replace("<", "&lt;").replace(">", "&gt;")
             debug_info = (
                 f"🔍 Детали ошибки:\n\n"
                 f"Целевой чат: {target_chat_id}\n"
@@ -138,11 +99,12 @@ async def send_formatted_message(
                 text=debug_info
             )
 
+# В функции start используем append_links_to_message из utils.py
 async def start(update: Update, context: CallbackContext) -> None:
     """Обрабатывает команду /start."""
     chat_id = update.effective_chat.id
     
-    # Создаем приветственное сообщение без HTML-тегов, кроме безопасных
+    # Создаем приветственное сообщение
     message = (
         "👋 Привет! Я бот для форматирования текста.\n\n"
         "Отправьте мне текст, и я помогу вам отформатировать его для Telegram.\n"
@@ -160,14 +122,12 @@ async def start(update: Update, context: CallbackContext) -> None:
         message += "/test - Включить/выключить тестовый режим\n"
         message += "/setformat [тип] - Установить формат по умолчанию (markdown, html, modern)"
     
-    # Создаем подпись
-    footer = create_footer()
-    if footer:
-        message += footer
+    # Используем append_links_to_message из utils.py для добавления подписи
+    message = append_links_to_message(message, 'html')
     
-    # Отправляем сообщение без HTML-разметки для безопасности
+    # Отправляем сообщение
     try:
-        await context.bot.send_message(chat_id=chat_id, text=message)
+        await context.bot.send_message(chat_id=chat_id, text=message, parse_mode=ParseMode.HTML)
     except Exception as e:
         logger.error(f"Ошибка при отправке стартового сообщения: {str(e)}", exc_info=True)
         # Попробуем отправить без форматирования
@@ -175,6 +135,7 @@ async def start(update: Update, context: CallbackContext) -> None:
             chat_id=chat_id, 
             text="👋 Привет! Я бот для форматирования текста. Используйте /format для выбора формата."
         )
+
 
 async def help_command(update: Update, context: CallbackContext) -> None:
     """Обрабатывает команду /help."""
