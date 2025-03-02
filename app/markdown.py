@@ -61,7 +61,7 @@ def process_bold_text(text: str) -> str:
     result = []
     bold_text = []
     
-    for line in lines:
+    for i, line in enumerate(lines):
         if line.strip() == '**' and not in_bold:
             in_bold = True
             continue
@@ -72,6 +72,14 @@ def process_bold_text(text: str) -> str:
                 result.append(f"<b>{' '.join(bold_text)}</b>")
                 bold_text = []
             continue
+        elif in_bold and i == len(lines) - 1 and line.endswith('**'):
+            # Случай когда ** находится в конце последней строки накопленного текста
+            line = line[:-2]  # Удаляем ** в конце
+            bold_text.append(line)
+            result.append(f"<b>{' '.join(bold_text)}</b>")
+            in_bold = False
+            bold_text = []
+            continue
         
         if in_bold:
             bold_text.append(line)
@@ -81,9 +89,20 @@ def process_bold_text(text: str) -> str:
             result.append(line)
     
     # Если остался незакрытый тег
-    if bold_text:
-        for line in bold_text:
-            result.append(line)
+    if in_bold and bold_text:
+        last_line = bold_text[-1]
+        if '**' in last_line:
+            # Проверяем, есть ли закрывающие ** в последней строке
+            parts = last_line.split('**')
+            if len(parts) > 1:
+                bold_text[-1] = parts[0]
+                result.append(f"<b>{' '.join(bold_text)}</b>")
+                if parts[1].strip():  # Если есть текст после закрывающего **
+                    result.append(parts[1])
+            else:
+                result.append(' '.join(bold_text))
+        else:
+            result.append(' '.join(bold_text))
     
     return '\n'.join(result)
 
@@ -111,7 +130,7 @@ def process_strikethrough_text(text: str) -> str:
     result = []
     strike_text = []
     
-    for line in lines:
+    for i, line in enumerate(lines):
         if line.strip() == '~~' and not in_strike:
             in_strike = True
             continue
@@ -122,18 +141,66 @@ def process_strikethrough_text(text: str) -> str:
                 result.append(f"<s>{' '.join(strike_text)}</s>")
                 strike_text = []
             continue
+        elif in_strike and i == len(lines) - 1 and line.endswith('~~'):
+            # Случай когда ~~ находится в конце последней строки накопленного текста
+            line = line[:-2]  # Удаляем ~~ в конце
+            strike_text.append(line)
+            result.append(f"<s>{' '.join(strike_text)}</s>")
+            in_strike = False
+            strike_text = []
+            continue
+        elif not in_strike and '~~' in line:
+            # Обработка строки с inline зачеркиванием ~~текст~~
+            parts = []
+            current = 0
+            while current < len(line):
+                start = line.find('~~', current)
+                if start == -1:
+                    parts.append(line[current:])
+                    break
+                
+                parts.append(line[current:start])
+                end = line.find('~~', start + 2)
+                if end == -1:
+                    # Если нет закрывающих ~~ в этой строке, но мы в последней строке
+                    if i == len(lines) - 1:
+                        # Просто добавляем оставшийся текст
+                        parts.append(line[start:])
+                    else:
+                        # Начинаем накопление многострочного зачеркнутого текста
+                        in_strike = True
+                        strike_text.append(line[start+2:])  # +2 чтобы пропустить ~~
+                    break
+                
+                # Нашли открывающий и закрывающий тег в одной строке
+                strike_content = line[start+2:end]
+                parts.append(f"<s>{strike_content}</s>")
+                current = end + 2
+            
+            if not in_strike:
+                result.append(''.join(parts))
+            continue
         
         if in_strike:
             strike_text.append(line)
         else:
-            # Обрабатываем inline ~~текст~~
-            line = re.sub(r'~~(.*?)~~', r'<s>\1</s>', line)
             result.append(line)
     
     # Если остался незакрытый тег
-    if strike_text:
-        for line in strike_text:
-            result.append(line)
+    if in_strike and strike_text:
+        last_line = strike_text[-1]
+        if '~~' in last_line:
+            # Проверяем, есть ли закрывающие ~~ в последней строке
+            parts = last_line.split('~~')
+            if len(parts) > 1:
+                strike_text[-1] = parts[0]
+                result.append(f"<s>{' '.join(strike_text)}</s>")
+                if parts[1].strip():  # Если есть текст после закрывающего ~~
+                    result.append(parts[1])
+            else:
+                result.append(' '.join(strike_text))
+        else:
+            result.append(' '.join(strike_text))
     
     return '\n'.join(result)
 
