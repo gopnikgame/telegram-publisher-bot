@@ -4,10 +4,10 @@
 set -euo pipefail
 
 # Конфигурация
-REPO_URL="https://github.com/gopnikgame/telegram-publisher-bot.git"
-PROJECT_DIR="telegram-publisher-bot"
+REPO_URL="https://github.com/gopnikgame/old-timer.git"
+PROJECT_DIR="old-timer"
 INSTALL_DIR="/opt/$PROJECT_DIR" # Постоянная директория для установки
-LOG_FILE="/var/log/telegram-publisher-bot.log"
+LOG_FILE="/var/log/old-timer.log"
 
 # Цвета для вывода
 RED='\033[0;31m'
